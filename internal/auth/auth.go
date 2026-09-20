@@ -20,7 +20,6 @@ type Claims struct {
 	Email    string   `json:"email"`
 	Roles    []string `json:"roles"`
 	Provider string   `json:"provider"` // "iap", "oauth2-proxy", "bearer", "dev"
-	RawToken string   `json:"-"`
 }
 
 // FromContext retrieves the authenticated claims from the context.
@@ -36,12 +35,12 @@ func WithClaims(ctx context.Context, claims *Claims) context.Context {
 
 const DefaultDevEmail = "developer@local.test"
 
-// UserEmailFromContext retrieves the authenticated user's email, or a fallback dev email if in dev mode or unset.
-func UserEmailFromContext(ctx context.Context) string {
+// UserEmailFromContext retrieves the authenticated user's email.
+func UserEmailFromContext(ctx context.Context) (string, bool) {
 	if claims, ok := FromContext(ctx); ok && claims != nil && claims.Email != "" {
-		return claims.Email
+		return claims.Email, true
 	}
-	return DefaultDevEmail
+	return "", false
 }
 
 // DevIdentityMiddleware returns an HTTP middleware that injects local development identity headers
@@ -97,7 +96,7 @@ func NewInterceptor(cfg Config) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			if !cfg.Enabled {
-				return next(ctx, req)
+				return next(WithClaims(ctx, &Claims{Subject: "anonymous", Email: "anonymous", Provider: "disabled"}), req)
 			}
 
 			// Check if this procedure skips authentication
@@ -106,129 +105,80 @@ func NewInterceptor(cfg Config) connect.UnaryInterceptorFunc {
 				return next(ctx, req)
 			}
 
-			header := req.Header()
-
-			if cfg.TrustProxyHeaders {
-				// 1. Check Google Cloud IAP headers
-				iapEmail := header.Get("X-Goog-Authenticated-User-Email")
-				iapID := header.Get("X-Goog-Authenticated-User-Id")
-				iapJWT := header.Get("X-Goog-IAP-JWT-Assertion")
-
-				if iapEmail != "" || iapJWT != "" {
-					var claims *Claims
-					if cfg.Validator != nil {
-						if iapJWT == "" {
-							return nil, connect.NewError(
-								connect.CodeUnauthenticated,
-								errors.New("missing required IAP JWT assertion"),
-							)
-						}
-						validatedClaims, err := cfg.Validator(ctx, iapJWT)
-						if err != nil {
-							return nil, connect.NewError(connect.CodeUnauthenticated, err)
-						}
-						claims = validatedClaims
-					} else {
-						cleanEmail := strings.TrimPrefix(iapEmail, "accounts.google.com:")
-						cleanID := strings.TrimPrefix(iapID, "accounts.google.com:")
-
-						claims = &Claims{
-							Subject:  cleanID,
-							Email:    cleanEmail,
-							Provider: "iap",
-							Roles:    []string{"user"},
-							RawToken: iapJWT,
-						}
-					}
-
-					ctx = WithClaims(ctx, claims)
-					return next(ctx, req)
-				}
-
-				// 2. Check Generic OAuth2 Proxy / Ingress headers.
-				forwardedEmail := header.Get("X-Forwarded-Email")
-				forwardedUser := header.Get("X-Forwarded-User")
-				if forwardedEmail != "" || forwardedUser != "" {
-					var roles []string
-					if groups := header.Get("X-Forwarded-Groups"); groups != "" {
-						for g := range strings.SplitSeq(groups, ",") {
-							roles = append(roles, strings.TrimSpace(g))
-						}
-					}
-					if len(roles) == 0 {
-						roles = []string{"user"}
-					}
-
-					claims := &Claims{
-						Subject:  forwardedUser,
-						Email:    forwardedEmail,
-						Provider: "oauth2-proxy",
-						Roles:    roles,
-					}
-					ctx = WithClaims(ctx, claims)
-					return next(ctx, req)
-				}
+			claims, err := authenticate(ctx, req.Header(), cfg)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeUnauthenticated, err)
 			}
-
-			// 3. Check Authorization: Bearer <token> (for service-to-service calls or API clients)
-			authHeader := header.Get("Authorization")
-			if authHeader != "" {
-				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
-					token := parts[1]
-
-					if cfg.Validator != nil {
-						claims, err := cfg.Validator(ctx, token)
-						if err != nil {
-							return nil, connect.NewError(connect.CodeUnauthenticated, err)
-						}
-						ctx = WithClaims(ctx, claims)
-						return next(ctx, req)
-					}
-
-					var matched bool
-					for _, validToken := range cfg.StaticTokens {
-						if subtle.ConstantTimeCompare([]byte(token), []byte(validToken)) == 1 {
-							matched = true
-							break
-						}
-					}
-
-					if matched {
-						claims := &Claims{
-							Subject:  "service-account",
-							Email:    "service@internal",
-							Provider: "bearer",
-							Roles:    []string{"service"},
-							RawToken: token,
-						}
-						ctx = WithClaims(ctx, claims)
-						return next(ctx, req)
-					}
-
-					return nil, connect.NewError(
-						connect.CodeUnauthenticated,
-						errors.New("invalid or expired bearer token"),
-					)
-				}
-			}
-
-			// 4. Dev Mode fallback: if running locally without an OAuth proxy, supply a default dev identity
-			if cfg.DevMode {
-				claims := &Claims{
-					Subject:  "dev-user",
-					Email:    "developer@local.test",
-					Provider: "dev",
-					Roles:    []string{"user", "admin"},
-				}
-				ctx = WithClaims(ctx, claims)
-				return next(ctx, req)
-			}
-
-			return nil, connect.NewError(
-				connect.CodeUnauthenticated,
-				errors.New("missing authentication credentials: no upstream proxy identity (IAP/OAuth2-Proxy) or authorization header found"),
-			)
+			return next(WithClaims(ctx, claims), req)
 		}
 	}
+}
+
+// Middleware applies the same authentication policy to ordinary HTTP handlers.
+func Middleware(cfg Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !cfg.Enabled {
+				next.ServeHTTP(w, r.WithContext(WithClaims(r.Context(), &Claims{Subject: "anonymous", Email: "anonymous", Provider: "disabled"})))
+				return
+			}
+			claims, err := authenticate(r.Context(), r.Header, cfg)
+			if err != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(WithClaims(r.Context(), claims)))
+		})
+	}
+}
+
+func authenticate(ctx context.Context, header http.Header, cfg Config) (*Claims, error) {
+	if cfg.TrustProxyHeaders {
+		iapEmail := header.Get("X-Goog-Authenticated-User-Email")
+		iapID := header.Get("X-Goog-Authenticated-User-Id")
+		iapJWT := header.Get("X-Goog-IAP-JWT-Assertion")
+		if iapEmail != "" || iapJWT != "" {
+			if cfg.Validator != nil {
+				if iapJWT == "" {
+					return nil, errors.New("missing required IAP JWT assertion")
+				}
+				return cfg.Validator(ctx, iapJWT)
+			}
+			return &Claims{Subject: strings.TrimPrefix(iapID, "accounts.google.com:"), Email: strings.TrimPrefix(iapEmail, "accounts.google.com:"), Provider: "iap", Roles: []string{"user"}}, nil
+		}
+
+		forwardedEmail := header.Get("X-Forwarded-Email")
+		forwardedUser := header.Get("X-Forwarded-User")
+		if forwardedEmail != "" || forwardedUser != "" {
+			var roles []string
+			for group := range strings.SplitSeq(header.Get("X-Forwarded-Groups"), ",") {
+				if group = strings.TrimSpace(group); group != "" {
+					roles = append(roles, group)
+				}
+			}
+			if len(roles) == 0 {
+				roles = []string{"user"}
+			}
+			return &Claims{Subject: forwardedUser, Email: forwardedEmail, Provider: "oauth2-proxy", Roles: roles}, nil
+		}
+	}
+
+	parts := strings.SplitN(header.Get("Authorization"), " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+		token := parts[1]
+		if cfg.Validator != nil {
+			return cfg.Validator(ctx, token)
+		}
+		for _, validToken := range cfg.StaticTokens {
+			if subtle.ConstantTimeCompare([]byte(token), []byte(validToken)) == 1 {
+				return &Claims{Subject: "service-account", Email: "service@internal", Provider: "bearer", Roles: []string{"service"}}, nil
+			}
+		}
+		return nil, errors.New("invalid or expired bearer token")
+	}
+
+	if cfg.DevMode {
+		return &Claims{Subject: "dev-user", Email: DefaultDevEmail, Provider: "dev", Roles: []string{"user", "admin"}}, nil
+	}
+	return nil, errors.New("missing authentication credentials")
 }

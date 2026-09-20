@@ -11,41 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addPetPhotoURL = `-- name: AddPetPhotoURL :one
-UPDATE pets
-SET photo_urls = array_append(photo_urls, $3::text),
-    modified_at = NOW(),
-    modified_by = $2
-WHERE id = $1
-RETURNING id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
-`
-
-type AddPetPhotoURLParams struct {
-	ID         pgtype.UUID `json:"id"`
-	ModifiedBy string      `json:"modified_by"`
-	PhotoUrl   string      `json:"photo_url"`
-}
-
-func (q *Queries) AddPetPhotoURL(ctx context.Context, arg AddPetPhotoURLParams) (Pet, error) {
-	row := q.db.QueryRow(ctx, addPetPhotoURL, arg.ID, arg.ModifiedBy, arg.PhotoUrl)
-	var i Pet
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Species,
-		&i.BirthDate,
-		&i.BirthDateEstimated,
-		&i.Status,
-		&i.PhotoUrls,
-		&i.Tags,
-		&i.CreatedAt,
-		&i.ModifiedAt,
-		&i.CreatedBy,
-		&i.ModifiedBy,
-	)
-	return i, err
-}
-
 const createPetPhoto = `-- name: CreatePetPhoto :one
 INSERT INTO pet_photos (
     pet_id, data, mime_type, size_bytes
@@ -145,6 +110,47 @@ func (q *Queries) ListPetPhotos(ctx context.Context, petID pgtype.UUID) ([]ListP
 	items := []ListPetPhotosRow{}
 	for rows.Next() {
 		var i ListPetPhotosRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PetID,
+			&i.MimeType,
+			&i.SizeBytes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotosForPets = `-- name: ListPhotosForPets :many
+SELECT id, pet_id, mime_type, size_bytes, created_at
+FROM pet_photos
+WHERE pet_id = ANY($1::uuid[])
+ORDER BY created_at DESC
+`
+
+type ListPhotosForPetsRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	PetID     pgtype.UUID        `json:"pet_id"`
+	MimeType  string             `json:"mime_type"`
+	SizeBytes int32              `json:"size_bytes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListPhotosForPets(ctx context.Context, petIds []pgtype.UUID) ([]ListPhotosForPetsRow, error) {
+	rows, err := q.db.Query(ctx, listPhotosForPets, petIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPhotosForPetsRow{}
+	for rows.Next() {
+		var i ListPhotosForPetsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PetID,

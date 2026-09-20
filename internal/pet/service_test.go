@@ -40,7 +40,7 @@ func TestToProtoPetStatusNormalization(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.input, func(t *testing.T) {
-			pet := toProtoPet(db.Pet{Status: tc.input})
+			pet := toProtoPet(db.Pet{Status: tc.input}, nil)
 			assert.Equal(t, tc.expected, pet.Status)
 		})
 	}
@@ -61,7 +61,7 @@ func TestIsValidImageMime(t *testing.T) {
 	assert.True(t, isValidImageMime("image/png", "image/png"))
 	assert.True(t, isValidImageMime("image/gif", "image/gif"))
 	assert.True(t, isValidImageMime("image/webp", "image/webp"))
-	assert.True(t, isValidImageMime("application/octet-stream", "image/webp"))
+	assert.False(t, isValidImageMime("application/octet-stream", "image/webp"))
 
 	assert.False(t, isValidImageMime("text/html", "image/png"))
 	assert.False(t, isValidImageMime("image/png", "image/jpeg"))

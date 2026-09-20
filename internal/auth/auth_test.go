@@ -260,3 +260,40 @@ func TestDevIdentityMiddleware(t *testing.T) {
 		assert.Equal(t, "Bearer custom-token", capturedReq.Header.Get("Authorization"))
 	})
 }
+
+func TestHTTPMiddleware(t *testing.T) {
+	middleware := auth.Middleware(auth.Config{Enabled: true, StaticTokens: []string{"valid-token"}})
+	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := auth.FromContext(r.Context())
+		if !assert.True(t, ok) {
+			http.Error(w, "claims missing", http.StatusInternalServerError)
+			return
+		}
+		assert.Equal(t, "service@internal", claims.Email)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	t.Run("rejects missing credentials", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/photos/id", nil))
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+	})
+
+	t.Run("accepts bearer credentials", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/photos/id", nil)
+		request.Header.Set("Authorization", "Bearer valid-token")
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+	})
+}
+
+func TestUserEmailFromContextRequiresIdentity(t *testing.T) {
+	email, ok := auth.UserEmailFromContext(context.Background())
+	assert.False(t, ok)
+	assert.Empty(t, email)
+
+	email, ok = auth.UserEmailFromContext(auth.WithClaims(context.Background(), &auth.Claims{Email: "user@example.com"}))
+	assert.True(t, ok)
+	assert.Equal(t, "user@example.com", email)
+}

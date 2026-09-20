@@ -31,11 +31,11 @@ func (q *Queries) CountPets(ctx context.Context, arg CountPetsParams) (int64, er
 
 const createPet = `-- name: CreatePet :one
 INSERT INTO pets (
-    name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+    name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8, $9
+    $1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8
 )
-RETURNING id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+RETURNING id, name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by
 `
 
 type CreatePetParams struct {
@@ -44,7 +44,6 @@ type CreatePetParams struct {
 	BirthDate          pgtype.Date `json:"birth_date"`
 	BirthDateEstimated bool        `json:"birth_date_estimated"`
 	Status             string      `json:"status"`
-	PhotoUrls          []string    `json:"photo_urls"`
 	Tags               []string    `json:"tags"`
 	CreatedBy          string      `json:"created_by"`
 	ModifiedBy         string      `json:"modified_by"`
@@ -57,7 +56,6 @@ func (q *Queries) CreatePet(ctx context.Context, arg CreatePetParams) (Pet, erro
 		arg.BirthDate,
 		arg.BirthDateEstimated,
 		arg.Status,
-		arg.PhotoUrls,
 		arg.Tags,
 		arg.CreatedBy,
 		arg.ModifiedBy,
@@ -70,7 +68,6 @@ func (q *Queries) CreatePet(ctx context.Context, arg CreatePetParams) (Pet, erro
 		&i.BirthDate,
 		&i.BirthDateEstimated,
 		&i.Status,
-		&i.PhotoUrls,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.ModifiedAt,
@@ -94,7 +91,7 @@ func (q *Queries) DeletePet(ctx context.Context, id pgtype.UUID) (int64, error) 
 }
 
 const getPet = `-- name: GetPet :one
-SELECT id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by FROM pets
+SELECT id, name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by FROM pets
 WHERE id = $1 LIMIT 1
 `
 
@@ -108,7 +105,6 @@ func (q *Queries) GetPet(ctx context.Context, id pgtype.UUID) (Pet, error) {
 		&i.BirthDate,
 		&i.BirthDateEstimated,
 		&i.Status,
-		&i.PhotoUrls,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.ModifiedAt,
@@ -119,7 +115,7 @@ func (q *Queries) GetPet(ctx context.Context, id pgtype.UUID) (Pet, error) {
 }
 
 const listPets = `-- name: ListPets :many
-SELECT id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by FROM pets
+SELECT id, name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by FROM pets
 WHERE ($3::text IS NULL OR status = $3)
   AND ($4::text IS NULL OR species = $4)
 ORDER BY created_at DESC, id DESC
@@ -154,7 +150,6 @@ func (q *Queries) ListPets(ctx context.Context, arg ListPetsParams) ([]Pet, erro
 			&i.BirthDate,
 			&i.BirthDateEstimated,
 			&i.Status,
-			&i.PhotoUrls,
 			&i.Tags,
 			&i.CreatedAt,
 			&i.ModifiedAt,
@@ -171,23 +166,21 @@ func (q *Queries) ListPets(ctx context.Context, arg ListPetsParams) ([]Pet, erro
 	return items, nil
 }
 
-const removePetPhotoURL = `-- name: RemovePetPhotoURL :one
+const touchPet = `-- name: TouchPet :one
 UPDATE pets
-SET photo_urls = array_remove(photo_urls, $3::text),
-    modified_at = NOW(),
+SET modified_at = NOW(),
     modified_by = $2
 WHERE id = $1
-RETURNING id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+RETURNING id, name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by
 `
 
-type RemovePetPhotoURLParams struct {
+type TouchPetParams struct {
 	ID         pgtype.UUID `json:"id"`
 	ModifiedBy string      `json:"modified_by"`
-	PhotoUrl   string      `json:"photo_url"`
 }
 
-func (q *Queries) RemovePetPhotoURL(ctx context.Context, arg RemovePetPhotoURLParams) (Pet, error) {
-	row := q.db.QueryRow(ctx, removePetPhotoURL, arg.ID, arg.ModifiedBy, arg.PhotoUrl)
+func (q *Queries) TouchPet(ctx context.Context, arg TouchPetParams) (Pet, error) {
+	row := q.db.QueryRow(ctx, touchPet, arg.ID, arg.ModifiedBy)
 	var i Pet
 	err := row.Scan(
 		&i.ID,
@@ -196,7 +189,6 @@ func (q *Queries) RemovePetPhotoURL(ctx context.Context, arg RemovePetPhotoURLPa
 		&i.BirthDate,
 		&i.BirthDateEstimated,
 		&i.Status,
-		&i.PhotoUrls,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.ModifiedAt,
@@ -214,12 +206,11 @@ SET
     birth_date = $4,
     birth_date_estimated = $5,
     status = $6,
-    photo_urls = $7,
-    tags = $8,
+    tags = $7,
     modified_at = NOW(),
-    modified_by = $9
+    modified_by = $8
 WHERE id = $1
-RETURNING id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+RETURNING id, name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by
 `
 
 type UpdatePetParams struct {
@@ -229,7 +220,6 @@ type UpdatePetParams struct {
 	BirthDate          pgtype.Date `json:"birth_date"`
 	BirthDateEstimated bool        `json:"birth_date_estimated"`
 	Status             string      `json:"status"`
-	PhotoUrls          []string    `json:"photo_urls"`
 	Tags               []string    `json:"tags"`
 	ModifiedBy         string      `json:"modified_by"`
 }
@@ -242,7 +232,6 @@ func (q *Queries) UpdatePet(ctx context.Context, arg UpdatePetParams) (Pet, erro
 		arg.BirthDate,
 		arg.BirthDateEstimated,
 		arg.Status,
-		arg.PhotoUrls,
 		arg.Tags,
 		arg.ModifiedBy,
 	)
@@ -254,7 +243,6 @@ func (q *Queries) UpdatePet(ctx context.Context, arg UpdatePetParams) (Pet, erro
 		&i.BirthDate,
 		&i.BirthDateEstimated,
 		&i.Status,
-		&i.PhotoUrls,
 		&i.Tags,
 		&i.CreatedAt,
 		&i.ModifiedAt,

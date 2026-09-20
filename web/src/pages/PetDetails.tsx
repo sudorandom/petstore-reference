@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PetService } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
 import { formatTimestamp, formatBirthDate, calculateAge } from '../lib/date';
+import { errorMessage } from '../lib/errors';
+import { acceptedPhotoTypes, readPhoto } from '../lib/photos';
 
 export const PetDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,9 +43,7 @@ export const PetDetails: React.FC = () => {
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (err) => {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setUploadError(msg);
+      setUploadError(errorMessage(err));
     },
   });
 
@@ -53,14 +53,11 @@ export const PetDetails: React.FC = () => {
       setUploadError(null);
     },
     onError: (err) => {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setUploadError(`Failed to delete photo: ${msg}`);
+      setUploadError(`Failed to delete photo: ${errorMessage(err)}`);
     },
   });
 
-  const handleDeletePhoto = (url: string) => {
-    const photoId = url.replace('/photos/', '');
+  const handleDeletePhoto = (photoId: string) => {
     if (confirm('Are you sure you want to delete this photo?')) {
       deletePhotoMutation.mutate({ photoId });
     }
@@ -72,32 +69,16 @@ export const PetDetails: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !pet) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('Photo must be less than 5MB.');
-      e.target.value = '';
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError('Photo must be a JPEG, PNG, WebP, or GIF image.');
-      e.target.value = '';
-      return;
-    }
-
     setUploadError(null);
     setIsUploading(true);
     try {
-      const buffer = await file.arrayBuffer();
       await uploadPhotoMutation.mutateAsync({
         petId: pet.id,
-        data: new Uint8Array(buffer),
+        data: await readPhoto(file),
         mimeType: file.type,
       });
-    } catch (err: any) {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setUploadError(msg);
+    } catch (err: unknown) {
+      setUploadError(errorMessage(err));
     } finally {
       setIsUploading(false);
     }
@@ -311,14 +292,12 @@ export const PetDetails: React.FC = () => {
 
             <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Photos</div>
             <div>
-              {pet.photoUrls && pet.photoUrls.length > 0 ? (
+              {pet.photos.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                  {pet.photoUrls.map((url, i) => {
-                    const isUploaded = url.startsWith('/photos/');
-                    return (
-                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  {pet.photos.map((photo, i) => (
+                    <div key={photo.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
                         <a
-                          href={url}
+                          href={photo.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -331,7 +310,7 @@ export const PetDetails: React.FC = () => {
                           title="View full image"
                         >
                           <img
-                            src={url}
+                            src={photo.url}
                             alt={`${pet.name} photo ${i + 1}`}
                             style={{
                               width: '120px',
@@ -341,20 +320,17 @@ export const PetDetails: React.FC = () => {
                             }}
                           />
                         </a>
-                        {isUploaded && (
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleDeletePhoto(url)}
-                            disabled={deletePhotoMutation.isPending}
-                            style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          disabled={deletePhotoMutation.isPending}
+                          style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}
+                        >
+                          Delete
+                        </button>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
@@ -367,7 +343,7 @@ export const PetDetails: React.FC = () => {
                   type="file"
                   ref={fileInputRef}
                   style={{ display: 'none' }}
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept={acceptedPhotoTypes.join(',')}
                   onChange={handlePhotoUpload}
                 />
                 <button

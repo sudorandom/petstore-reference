@@ -225,9 +225,9 @@ export const PetList: React.FC = () => {
               <div key={pet.id} className="pet-item">
                 <div className="pet-header">
                   <div className="pet-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    {pet.photoUrls && pet.photoUrls.length > 0 && (
+                    {pet.photos.length > 0 && (
                       <img
-                        src={pet.photoUrls[0]}
+                        src={pet.photos[0].url}
                         alt={pet.name}
                         style={{
                           width: '32px',

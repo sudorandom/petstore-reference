@@ -77,7 +77,7 @@ func main() {
 		log.Fatalf("Failed to initialize OpenTelemetry Connect interceptor: %v", err)
 	}
 	valInterceptor := validate.NewInterceptor()
-	authInterceptor := auth.NewInterceptor(auth.Config{
+	authCfg := auth.Config{
 		Enabled:           cfg.AuthEnabled,
 		DevMode:           cfg.DevMode,
 		StaticTokens:      cfg.AuthTokens,
@@ -87,7 +87,8 @@ func main() {
 			// petv1connect.PetServiceListPetsProcedure: true,
 			// petv1connect.PetServiceGetPetProcedure:   true,
 		},
-	})
+	}
+	authInterceptor := auth.NewInterceptor(authCfg)
 
 	mux := http.NewServeMux()
 
@@ -135,7 +136,8 @@ func main() {
 	})
 
 	// Serve uploaded pet photos directly to browsers (instrumented with OpenTelemetry)
-	mux.Handle("GET /photos/{id}", otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos"))
+	photoHandler := otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos")
+	mux.Handle("GET /photos/{id}", auth.Middleware(authCfg)(photoHandler))
 
 	var rootHandler http.Handler = mux
 

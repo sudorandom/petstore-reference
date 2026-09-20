@@ -1,9 +1,0 @@
-stubs:
-  - id: get-pet-photo
-    target: pet.v1.PetService/GetPetPhoto
-    cel_content: |
-      {
-        'photo_id': req.photo_id,
-        'pet_id': 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-        'mime_type': 'image/jpeg'
-      }

@@ -50,7 +50,7 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
 │   └── pet/v1/pet.proto    # Protobuf schema with validation rules
 ├── gen/                    # Generated Go stubs, OpenAPI specs, and binary descriptor images
 ├── sql/
-│   ├── schema/001_pets.sql # DDL schema for PostgreSQL (consolidated)
+│   ├── schema/             # Versioned Goose migrations
 │   └── queries/            # SQLC queries for pets and photos
 ├── stubs/
 │   ├── normal/             # FauxRPC stubs with CEL dynamic responses
@@ -65,22 +65,6 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
     │   └── test/           # Vitest tests with ephemeral FauxRPC server
     └── package.json
 ```
-
----
-
-## 🔐 Authentication Architecture
-
-Authentication assumes an upstream reverse proxy or ingress auth layer (e.g. **Google Cloud IAP**, **OAuth2 Proxy**, **Envoy OAuth**, **Cloudflare Access**) that terminates user login at the boundary:
-- **Upstream Identity Extraction**:
-  - **Google Cloud IAP**: Extracts user email (`X-Goog-Authenticated-User-Email`), subject ID (`X-Goog-Authenticated-User-Id`), and optional JWT assertions (`X-Goog-IAP-JWT-Assertion`) when `TRUST_PROXY_HEADERS=true`.
-  - **OAuth2 Proxy / Ingress**: Extracts email (`X-Forwarded-Email`), user (`X-Forwarded-User`), and groups/roles (`X-Forwarded-Groups`) when `TRUST_PROXY_HEADERS=true`.
-  - **Service-to-Service Fallback**: Also accepts standard `Authorization: Bearer <token>` for machine-to-machine or CLI API calls.
-- **Context Propagation**: Authenticated caller [`Claims`](internal/auth/auth.go) are injected into `context.Context` (accessible via `auth.FromContext(ctx)`).
-- **Seamless Local Development**: In development mode (`DEV_MODE=true`), requests without upstream proxy headers automatically receive a default local dev identity, so the frontend and backend work out of the box without manual token inputs.
-- **Web Frontend**: The browser Connect-ES client uses `credentials: "include"` so session cookies are automatically passed to the proxy. No manual tokens are needed in the UI.
-
-`TRUST_PROXY_HEADERS` must only be enabled when the service cannot be reached without a trusted proxy that strips client-supplied identity headers. Production has no default bearer token; configure `AUTH_TOKENS`, trusted proxy headers, or both. Cross-origin browser clients must be explicitly listed in the comma-separated `CORS_ALLOWED_ORIGINS` variable.
-
 ---
 
 ## 🚀 Getting Started
@@ -133,10 +117,10 @@ The service will be listening on `https://localhost:8080` (TLS enabled via `mkce
 ```bash
 just web-dev
 ```
-Open `https://localhost:5173` in your browser (TLS enabled via `mkcert`).
-- **Web Interface:** `https://localhost:5173/`
-- **Embedded API Documentation (Scalar):** `https://localhost:5173/docs`
-- **OpenAPI 3.1 Spec (YAML):** `https://localhost:5173/openapi.yaml`
+Open `https://localhost:4321` in your browser (TLS enabled via `mkcert`).
+- **Web Interface:** `https://localhost:4321/`
+- **Embedded API Documentation (Scalar):** `https://localhost:4321/docs`
+- **OpenAPI 3.1 Spec (YAML):** `https://localhost:4321/openapi.yaml`
 
 ### 7. Run FauxRPC Standalone Mock Server
 To run a mock server with fake data without starting PostgreSQL:
@@ -164,7 +148,7 @@ You can test the frontend against FauxRPC both interactively in the browser and 
    ```bash
    just web-mock
    ```
-   The frontend at `https://localhost:5173` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
+   The frontend at `https://localhost:4321` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
 
 #### Automated Frontend Tests
 Run the Vitest test suite, which automatically spawns ephemeral FauxRPC mock servers and verifies frontend pages, components, and error states:
@@ -175,3 +159,14 @@ Or from the `web` directory:
 ```bash
 pnpm test
 ```
+
+---
+
+## 🔐 Authentication
+
+In production, user login is handled by an upstream reverse proxy (like Google Cloud IAP or OAuth2 Proxy), which forwards user identity via headers. The service also supports static bearer tokens for machine-to-machine calls.
+
+- **Proxy headers**: Reads identity from IAP (`X-Goog-Authenticated-User-*`) or OAuth2 Proxy (`X-Forwarded-*`) when `TRUST_PROXY_HEADERS=true`. Only enable this behind a proxy that strips untrusted client headers.
+- **Bearer tokens**: Set `AUTH_TOKENS=token1,token2` for service-to-service or CLI access (`Authorization: Bearer <token>`).
+- **Local dev**: When `DEV_MODE=true` (default), requests without credentials automatically use a dummy developer identity (`developer@local.test`).
+- **Context**: Parsed claims are accessible in Go handlers via [`auth.FromContext(ctx)`](internal/auth/auth.go).

@@ -15,7 +15,6 @@ type Pet struct {
 	BirthDate          pgtype.Date        `json:"birth_date"`
 	BirthDateEstimated bool               `json:"birth_date_estimated"`
 	Status             string             `json:"status"`
-	PhotoUrls          []string           `json:"photo_urls"`
 	Tags               []string           `json:"tags"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	ModifiedAt         pgtype.Timestamptz `json:"modified_at"`

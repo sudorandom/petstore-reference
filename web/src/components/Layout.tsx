@@ -30,7 +30,7 @@ export const Layout: React.FC<LayoutProps> = ({ breadcrumbs, children }) => {
             <a href="/openapi.yaml" target="_blank" rel="noopener noreferrer">
               OpenAPI Spec
             </a>
-            <a href="https://localhost:8080/healthz" target="_blank" rel="noopener noreferrer">
+            <a href="/healthz" target="_blank" rel="noopener noreferrer">
               Health
             </a>
           </nav>

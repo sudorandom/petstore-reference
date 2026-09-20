@@ -17,15 +17,13 @@ FROM pet_photos
 WHERE pet_id = $1
 ORDER BY created_at DESC;
 
+-- name: ListPhotosForPets :many
+SELECT id, pet_id, mime_type, size_bytes, created_at
+FROM pet_photos
+WHERE pet_id = ANY(sqlc.arg('pet_ids')::uuid[])
+ORDER BY created_at DESC;
+
 -- name: DeletePetPhoto :one
 DELETE FROM pet_photos
 WHERE id = $1
 RETURNING pet_id;
-
--- name: AddPetPhotoURL :one
-UPDATE pets
-SET photo_urls = array_append(photo_urls, sqlc.arg('photo_url')::text),
-    modified_at = NOW(),
-    modified_by = $2
-WHERE id = $1
-RETURNING *;

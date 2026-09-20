@@ -4,6 +4,9 @@ import { useQuery, useMutation } from '@connectrpc/connect-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { PetService, PetStatus } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
+import { PetFormFields } from '../components/PetFormFields';
+import { errorMessage } from '../lib/errors';
+import { acceptedPhotoTypes, readPhoto } from '../lib/photos';
 
 function formatDate(ts?: { seconds: bigint }): string {
   if (!ts || !ts.seconds) return 'N/A';
@@ -34,7 +37,6 @@ export const EditPet: React.FC = () => {
   const [birthDateEstimated, setBirthDateEstimated] = useState(false);
   const [status, setStatus] = useState<PetStatus>(PetStatus.AVAILABLE);
   const [tags, setTags] = useState('');
-  const [photos, setPhotos] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -48,7 +50,6 @@ export const EditPet: React.FC = () => {
       setBirthDateEstimated(pet.birthDateEstimated);
       setStatus(pet.status || PetStatus.AVAILABLE);
       setTags((pet.tags || []).join(', '));
-      setPhotos((pet.photoUrls || []).join(', '));
     }
   }, [pet]);
 
@@ -58,21 +59,16 @@ export const EditPet: React.FC = () => {
       navigate(`/pets/${id}`);
     },
     onError: (err) => {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setValidationError(msg);
+      setValidationError(errorMessage(err));
     },
   });
 
   const uploadPhotoMutation = useMutation(PetService.method.uploadPetPhoto, {
-    onSuccess: (res) => {
-      setPhotos((prev) => (prev ? `${prev}, ${res.photoUrl}` : res.photoUrl));
+    onSuccess: () => {
       queryClient.invalidateQueries();
     },
     onError: (err) => {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setValidationError(msg);
+      setValidationError(errorMessage(err));
     },
   });
 
@@ -80,32 +76,16 @@ export const EditPet: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !pet) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setValidationError('Photo must be less than 5MB.');
-      e.target.value = '';
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      setValidationError('Photo must be a JPEG, PNG, WebP, or GIF image.');
-      e.target.value = '';
-      return;
-    }
-
     setValidationError(null);
     setIsUploading(true);
     try {
-      const buffer = await file.arrayBuffer();
       await uploadPhotoMutation.mutateAsync({
         petId: pet.id,
-        data: new Uint8Array(buffer),
+        data: await readPhoto(file),
         mimeType: file.type,
       });
-    } catch (err: any) {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setValidationError(msg);
+    } catch (err: unknown) {
+      setValidationError(errorMessage(err));
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -120,11 +100,6 @@ export const EditPet: React.FC = () => {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    const photoList = photos
-      .split(',')
-      .map((u) => u.trim())
-      .filter(Boolean);
-
     updateMutation.mutate({
       id: id || '',
       name: name.trim(),
@@ -133,7 +108,6 @@ export const EditPet: React.FC = () => {
       birthDateEstimated,
       status,
       tags: tagList,
-      photoUrls: photoList,
     });
   };
 
@@ -197,100 +171,14 @@ export const EditPet: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="pet-name" className="required">
-                Name
-              </label>
-              <input
-                type="text"
-                id="pet-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-              <div className="helper-text">1 - 100 characters</div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="pet-species" className="required">
-                Species
-              </label>
-              <input
-                type="text"
-                id="pet-species"
-                value={species}
-                onChange={(e) => setSpecies(e.target.value)}
-                required
-              />
-              <div className="helper-text">1 - 50 characters</div>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="pet-birth-date" className="required">
-                Birth Date
-              </label>
-              <input
-                type="date"
-                id="pet-birth-date"
-                value={birthDate}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setBirthDate(e.target.value)}
-                required
-              />
-              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <input
-                  type="checkbox"
-                  id="pet-birth-date-estimated"
-                  checked={birthDateEstimated}
-                  onChange={(e) => setBirthDateEstimated(e.target.checked)}
-                  style={{ width: 'auto', cursor: 'pointer' }}
-                />
-                <label htmlFor="pet-birth-date-estimated" style={{ margin: 0, fontSize: '0.8rem', fontWeight: 'normal', cursor: 'pointer' }}>
-                  This birth date is an estimate
-                </label>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="pet-status">Status</label>
-              <select
-                id="pet-status"
-                value={status}
-                onChange={(e) => setStatus(parseInt(e.target.value, 10) as PetStatus)}
-              >
-                <option value={PetStatus.AVAILABLE}>Available</option>
-                <option value={PetStatus.PENDING}>Pending</option>
-                <option value={PetStatus.ADOPTED}>Adopted</option>
-              </select>
-            </div>
-          </div>
+          <PetFormFields
+            name={name} species={species} birthDate={birthDate} birthDateEstimated={birthDateEstimated}
+            status={status} tags={tags} onNameChange={setName} onSpeciesChange={setSpecies}
+            onBirthDateChange={setBirthDate} onBirthDateEstimatedChange={setBirthDateEstimated}
+            onStatusChange={setStatus} onTagsChange={setTags}
+          />
 
           <div className="form-group">
-            <label htmlFor="pet-tags">Tags</label>
-            <input
-              type="text"
-              id="pet-tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="e.g. friendly, vaccinated, playful"
-            />
-            <div className="helper-text">Separate tags with commas</div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="pet-photos">Photo URLs</label>
-            <input
-              type="text"
-              id="pet-photos"
-              value={photos}
-              onChange={(e) => setPhotos(e.target.value)}
-              placeholder="e.g. https://example.com/pet1.jpg, https://example.com/pet2.jpg"
-            />
-            <div className="helper-text">Separate image URLs with commas</div>
-
             <div style={{ marginTop: '0.75rem' }}>
               <label htmlFor="pet-upload-photo" style={{ fontSize: '0.85rem' }}>
                 Upload Photo to Database
@@ -298,7 +186,7 @@ export const EditPet: React.FC = () => {
               <input
                 type="file"
                 id="pet-upload-photo"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={acceptedPhotoTypes.join(',')}
                 onChange={handlePhotoUpload}
                 disabled={isUploading}
               />

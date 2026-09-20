@@ -32,6 +32,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        '/healthz': {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
       ...(hasCerts
         ? {
@@ -61,4 +66,3 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
-

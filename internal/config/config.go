@@ -65,7 +65,7 @@ func Load() *Config {
 		return origin == "*"
 	})
 	if len(allowedOrigins) == 0 && devMode {
-		allowedOrigins = []string{"https://localhost:5173", "http://localhost:5173"}
+		allowedOrigins = []string{"https://localhost:4321", "http://localhost:4321"}
 	}
 
 	certFile := getEnv("TLS_CERT_FILE", ".certs/cert.pem")
