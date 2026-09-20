@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -24,22 +25,132 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	os.Unsetenv("OTEL_SERVICE_NAME")
 	os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	os.Unsetenv("OTEL_TRACES_EXPORTER")
+	os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
+	os.Unsetenv("OTEL_TRACES_SAMPLER_ARG")
 
 	cfg := LoadConfigFromEnv()
 	assert.Equal(t, "pets-service", cfg.ServiceName)
 	assert.Equal(t, "none", cfg.ExporterType)
+	assert.Equal(t, 100.0, cfg.SamplePercentage)
 
 	// Test custom env
 	_ = os.Setenv("OTEL_SERVICE_NAME", "custom-petstore")
 	_ = os.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
+	_ = os.Setenv("OTEL_SAMPLE_PERCENTAGE", "25%")
 	defer func() {
 		os.Unsetenv("OTEL_SERVICE_NAME")
 		os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+		os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
+		os.Unsetenv("OTEL_TRACES_SAMPLER_ARG")
 	}()
 
 	cfg = LoadConfigFromEnv()
 	assert.Equal(t, "custom-petstore", cfg.ServiceName)
 	assert.Equal(t, "otlp", cfg.ExporterType)
+	assert.Equal(t, 25.0, cfg.SamplePercentage)
+
+	// Test OTEL_SAMPLE_PERCENTAGE=0
+	_ = os.Setenv("OTEL_SAMPLE_PERCENTAGE", "0")
+	cfg = LoadConfigFromEnv()
+	assert.Equal(t, 0.0, cfg.SamplePercentage)
+
+	// Test OTEL_TRACES_SAMPLER_ARG=0.5 ratio
+	os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
+	_ = os.Setenv("OTEL_TRACES_SAMPLER_ARG", "0.5")
+	cfg = LoadConfigFromEnv()
+	assert.Equal(t, 50.0, cfg.SamplePercentage)
+}
+
+func TestLoadConfig_FromConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 1. YAML Config File
+	yamlFile := filepath.Join(tmpDir, "telemetry.yaml")
+	yamlContent := `
+service_name: "yaml-pets-service"
+service_version: "2.1.0"
+exporter_type: "stdout"
+sample_percentage: 45.5
+insecure: false
+`
+	require.NoError(t, os.WriteFile(yamlFile, []byte(yamlContent), 0o600))
+
+	cfg := LoadConfigFromEnv(yamlFile)
+	assert.Equal(t, "yaml-pets-service", cfg.ServiceName)
+	assert.Equal(t, "2.1.0", cfg.ServiceVersion)
+	assert.Equal(t, "stdout", cfg.ExporterType)
+	assert.False(t, cfg.Insecure)
+	assert.Equal(t, 45.5, cfg.SamplePercentage)
+
+	// 2. Override config file with environment variable
+	t.Setenv("OTEL_SERVICE_NAME", "env-override-service")
+	t.Setenv("OTEL_SAMPLE_PERCENTAGE", "75")
+	cfgOverridden := LoadConfigFromEnv(yamlFile)
+	assert.Equal(t, "env-override-service", cfgOverridden.ServiceName)
+	assert.Equal(t, 75.0, cfgOverridden.SamplePercentage)
+	// Other fields from YAML remain intact
+	assert.Equal(t, "2.1.0", cfgOverridden.ServiceVersion)
+	assert.Equal(t, "stdout", cfgOverridden.ExporterType)
+
+	// 3. Config file via OTEL_CONFIG_FILE env var
+	t.Setenv("OTEL_CONFIG_FILE", yamlFile)
+	os.Unsetenv("OTEL_SERVICE_NAME")
+	os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
+	cfgFromEnvFile := LoadConfigFromEnv()
+	assert.Equal(t, "yaml-pets-service", cfgFromEnvFile.ServiceName)
+	assert.Equal(t, 45.5, cfgFromEnvFile.SamplePercentage)
+}
+
+func TestInit_Sampling(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("0% sampling drops root spans but respects remote parent", func(t *testing.T) {
+		cfg := Config{
+			ServiceName:      "test-sampler-0",
+			ServiceVersion:   "1.0.0",
+			ExporterType:     "none",
+			SamplePercentage: 0.0,
+		}
+		shutdown, err := Init(ctx, cfg)
+		require.NoError(t, err)
+		defer func() { _ = shutdown(ctx) }()
+
+		tracer := otel.Tracer("test")
+
+		// Root span should NOT be sampled with 0%
+		_, rootSpan := tracer.Start(ctx, "root-span")
+		assert.False(t, rootSpan.SpanContext().IsSampled())
+		rootSpan.End()
+
+		// Remote sampled parent should STILL be sampled (ParentBased)
+		remoteSpanContext := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    trace.TraceID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+			SpanID:     trace.SpanID{1, 2, 3, 4, 5, 6, 7, 8},
+			TraceFlags: trace.FlagsSampled,
+			Remote:     true,
+		})
+		parentCtx := trace.ContextWithRemoteSpanContext(ctx, remoteSpanContext)
+		_, childSpan := tracer.Start(parentCtx, "child-span")
+		assert.True(t, childSpan.SpanContext().IsSampled(), "expected ParentBased to respect remote sampled parent")
+		childSpan.End()
+	})
+
+	t.Run("100% sampling samples root spans", func(t *testing.T) {
+		cfg := Config{
+			ServiceName:      "test-sampler-100",
+			ServiceVersion:   "1.0.0",
+			ExporterType:     "none",
+			SamplePercentage: 100.0,
+		}
+		shutdown, err := Init(ctx, cfg)
+		require.NoError(t, err)
+		defer func() { _ = shutdown(ctx) }()
+
+		tracer := otel.Tracer("test")
+		_, rootSpan := tracer.Start(ctx, "root-span")
+		assert.True(t, rootSpan.SpanContext().IsSampled())
+		rootSpan.End()
+	})
 }
 
 func TestInit(t *testing.T) {

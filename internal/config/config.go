@@ -19,6 +19,8 @@ type Config struct {
 	CertFile          string
 	KeyFile           string
 	AutoMigrate       bool
+	LogLevel          string
+	LogFormat         string
 }
 
 func Load() *Config {
@@ -71,6 +73,15 @@ func Load() *Config {
 	certFile := getEnv("TLS_CERT_FILE", ".certs/cert.pem")
 	keyFile := getEnv("TLS_KEY_FILE", ".certs/key.pem")
 
+	defaultLogLevel := "info"
+	defaultLogFormat := "json"
+	if devMode {
+		defaultLogLevel = "debug"
+		defaultLogFormat = "text"
+	}
+	logLevel := getEnv("LOG_LEVEL", defaultLogLevel)
+	logFormat := getEnv("LOG_FORMAT", defaultLogFormat)
+
 	return &Config{
 		Port:              port,
 		DatabaseURL:       dbURL,
@@ -83,6 +94,8 @@ func Load() *Config {
 		CertFile:          certFile,
 		KeyFile:           keyFile,
 		AutoMigrate:       autoMigrate,
+		LogLevel:          logLevel,
+		LogFormat:         logFormat,
 	}
 }
 

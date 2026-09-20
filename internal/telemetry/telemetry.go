@@ -3,11 +3,14 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/otelconnect"
+	"github.com/ilyakaznacheev/cleanenv"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -19,47 +22,73 @@ import (
 
 // Config holds configuration options for OpenTelemetry.
 type Config struct {
-	ServiceName    string
-	ServiceVersion string
-	OTLPEndpoint   string
-	Insecure       bool
-	ExporterType   string // "otlp", "stdout", "none"
+	ServiceName      string  `env:"OTEL_SERVICE_NAME" yaml:"service_name" json:"service_name"`
+	ServiceVersion   string  `env:"OTEL_SERVICE_VERSION" yaml:"service_version" json:"service_version"`
+	OTLPEndpoint     string  `env:"OTEL_EXPORTER_OTLP_ENDPOINT" yaml:"otlp_endpoint" json:"otlp_endpoint"`
+	Insecure         bool    `env:"OTEL_EXPORTER_OTLP_INSECURE" yaml:"insecure" json:"insecure"`
+	ExporterType     string  `env:"OTEL_TRACES_EXPORTER" yaml:"exporter_type" json:"exporter_type"`
+	SamplePercentage float64 `env:"OTEL_SAMPLE_PERCENTAGE" yaml:"sample_percentage" json:"sample_percentage"`
 }
 
-// LoadConfigFromEnv builds a Config from standard environment variables.
-func LoadConfigFromEnv() Config {
-	serviceName := os.Getenv("OTEL_SERVICE_NAME")
-	if serviceName == "" {
-		serviceName = "pets-service"
+// LoadConfigFromEnv builds a Config from environment variables and optional configuration files (YAML, JSON, TOML).
+// If configPath is provided or OTEL_CONFIG_FILE / CONFIG_FILE is set, the file is read and then overridden by environment variables.
+func LoadConfigFromEnv(configPath ...string) Config {
+	cfg := Config{
+		ServiceName:      "pets-service",
+		ServiceVersion:   "1.0.0",
+		Insecure:         true,
+		SamplePercentage: 100.0,
 	}
 
-	serviceVersion := os.Getenv("OTEL_SERVICE_VERSION")
-	if serviceVersion == "" {
-		serviceVersion = "1.0.0"
-	}
-
-	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	exporterType := strings.ToLower(os.Getenv("OTEL_TRACES_EXPORTER"))
-	if exporterType == "" {
-		if otlpEndpoint != "" {
-			exporterType = "otlp"
-		} else {
-			exporterType = "none"
+	// Sanitize environment variables for cleanenv
+	if val, ok := os.LookupEnv("OTEL_SAMPLE_PERCENTAGE"); ok {
+		if before, ok0 := strings.CutSuffix(val, "%"); ok0 {
+			_ = os.Setenv("OTEL_SAMPLE_PERCENTAGE", before)
+		}
+	} else if val := os.Getenv("OTEL_TRACES_SAMPLER_ARG"); val != "" {
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(val), 64); err == nil {
+			if parsed <= 1.0 && parsed > 0 {
+				parsed = parsed * 100.0
+			}
+			_ = os.Setenv("OTEL_SAMPLE_PERCENTAGE", strconv.FormatFloat(parsed, 'f', -1, 64))
+			defer func() { _ = os.Unsetenv("OTEL_SAMPLE_PERCENTAGE") }()
 		}
 	}
 
-	insecure := true
-	if val := os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"); val != "" {
-		insecure = strings.ToLower(val) == "true" || val == "1"
+	targetPath := ""
+	if len(configPath) > 0 && configPath[0] != "" {
+		targetPath = configPath[0]
+	} else if envPath := os.Getenv("OTEL_CONFIG_FILE"); envPath != "" {
+		targetPath = envPath
+	} else if envPath := os.Getenv("CONFIG_FILE"); envPath != "" {
+		targetPath = envPath
 	}
 
-	return Config{
-		ServiceName:    serviceName,
-		ServiceVersion: serviceVersion,
-		OTLPEndpoint:   otlpEndpoint,
-		Insecure:       insecure,
-		ExporterType:   exporterType,
+	if targetPath != "" {
+		if _, err := os.Stat(targetPath); err == nil {
+			if err := cleanenv.ReadConfig(targetPath, &cfg); err != nil {
+				slog.Warn("Failed to read telemetry config file, falling back to environment variables",
+					"path", targetPath,
+					"error", err,
+				)
+				_ = cleanenv.ReadEnv(&cfg)
+			}
+		} else {
+			_ = cleanenv.ReadEnv(&cfg)
+		}
+	} else {
+		_ = cleanenv.ReadEnv(&cfg)
 	}
+
+	if cfg.ExporterType == "" {
+		if cfg.OTLPEndpoint != "" {
+			cfg.ExporterType = "otlp"
+		} else {
+			cfg.ExporterType = "none"
+		}
+	}
+
+	return cfg
 }
 
 // Init initializes the OpenTelemetry TracerProvider and global propagators.
@@ -84,6 +113,19 @@ func Init(ctx context.Context, cfg Config) (func(context.Context) error, error) 
 
 	var opts []sdktrace.TracerProviderOption
 	opts = append(opts, sdktrace.WithResource(res))
+
+	// Configure sampler: ParentBased ensures remote parent sampling decisions are respected.
+	// For root spans (no parent), the sample percentage is used.
+	var rootSampler sdktrace.Sampler
+	switch {
+	case cfg.SamplePercentage >= 100.0:
+		rootSampler = sdktrace.AlwaysSample()
+	case cfg.SamplePercentage <= 0.0:
+		rootSampler = sdktrace.NeverSample()
+	default:
+		rootSampler = sdktrace.TraceIDRatioBased(cfg.SamplePercentage / 100.0)
+	}
+	opts = append(opts, sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)))
 
 	switch cfg.ExporterType {
 	case "stdout":

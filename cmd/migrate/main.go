@@ -4,15 +4,44 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/example/pets/internal/config"
 	"github.com/example/pets/internal/db"
 )
 
+func setupLogger(cfg *config.Config) {
+	var level slog.Level
+	switch strings.ToLower(cfg.LogLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	opts := &slog.HandlerOptions{
+		Level: level,
+	}
+
+	var handler slog.Handler
+	if strings.ToLower(cfg.LogFormat) == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	}
+
+	slog.SetDefault(slog.New(handler))
+}
+
 func main() {
 	cfg := config.Load()
+	setupLogger(cfg)
 
 	flag.Parse()
 	command := flag.Arg(0)
@@ -23,27 +52,31 @@ func main() {
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
 	switch command {
 	case "up":
-		log.Println("Applying database migrations...")
+		slog.Info("Applying database migrations...")
 		if err := db.Migrate(ctx, pool); err != nil {
-			log.Fatalf("Migration failed: %v", err)
+			slog.Error("Migration failed", "error", err)
+			os.Exit(1)
 		}
-		log.Println("Migrations applied successfully.")
+		slog.Info("Migrations applied successfully")
 	case "down":
-		log.Println("Rolling back last migration...")
+		slog.Info("Rolling back last migration...")
 		if err := db.MigrateDown(ctx, pool); err != nil {
-			log.Fatalf("Rollback failed: %v", err)
+			slog.Error("Rollback failed", "error", err)
+			os.Exit(1)
 		}
-		log.Println("Rollback completed successfully.")
+		slog.Info("Rollback completed successfully")
 	case "status":
 		statuses, err := db.MigrationStatus(ctx, pool)
 		if err != nil {
-			log.Fatalf("Failed to get migration status: %v", err)
+			slog.Error("Failed to get migration status", "error", err)
+			os.Exit(1)
 		}
 		fmt.Printf("%-20s %-30s %s\n", "VERSION", "MIGRATION", "STATUS")
 		for _, s := range statuses {

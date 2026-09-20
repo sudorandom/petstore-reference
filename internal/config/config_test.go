@@ -60,6 +60,8 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	assert.Equal(t, "developer@local.test", cfg.DevEmail)
 	assert.Equal(t, []string{"dev-secret-token"}, cfg.AuthTokens)
 	assert.Equal(t, []string{"https://localhost:4321", "http://localhost:4321"}, cfg.AllowedOrigins)
+	assert.Equal(t, "debug", cfg.LogLevel)
+	assert.Equal(t, "text", cfg.LogFormat)
 }
 
 func TestLoadCustomOverrides(t *testing.T) {
@@ -71,6 +73,8 @@ func TestLoadCustomOverrides(t *testing.T) {
 	t.Setenv("DEV_EMAIL", "custom@example.com")
 	t.Setenv("TLS_CERT_FILE", "custom-cert.pem")
 	t.Setenv("TLS_KEY_FILE", "custom-key.pem")
+	t.Setenv("LOG_LEVEL", "warn")
+	t.Setenv("LOG_FORMAT", "json")
 
 	cfg := Load()
 
@@ -82,4 +86,6 @@ func TestLoadCustomOverrides(t *testing.T) {
 	assert.Equal(t, "custom@example.com", cfg.DevEmail)
 	assert.Equal(t, "custom-cert.pem", cfg.CertFile)
 	assert.Equal(t, "custom-key.pem", cfg.KeyFile)
+	assert.Equal(t, "warn", cfg.LogLevel)
+	assert.Equal(t, "json", cfg.LogFormat)
 }

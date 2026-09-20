@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,27 +27,57 @@ import (
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
 
+func setupLogger(cfg *config.Config) {
+	var level slog.Level
+	switch strings.ToLower(cfg.LogLevel) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	opts := &slog.HandlerOptions{
+		Level: level,
+	}
+
+	var handler slog.Handler
+	if strings.ToLower(cfg.LogFormat) == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	}
+
+	slog.SetDefault(slog.New(handler))
+}
+
 func main() {
 	cfg := config.Load()
+	setupLogger(cfg)
+
 	if cfg.AuthEnabled && !cfg.DevMode && !cfg.TrustProxyHeaders && len(cfg.AuthTokens) == 0 {
-		log.Fatal("Authentication is enabled, but neither TRUST_PROXY_HEADERS nor AUTH_TOKENS is configured")
+		slog.Error("Authentication is enabled, but neither TRUST_PROXY_HEADERS nor AUTH_TOKENS is configured")
+		os.Exit(1)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Printf("Starting Pet Microservice on port %s...", cfg.Port)
+	slog.Info("Starting Pet Microservice", "port", cfg.Port, "dev_mode", cfg.DevMode)
 
 	// Initialize OpenTelemetry
 	otelCfg := telemetry.LoadConfigFromEnv()
 	shutdownOTel, err := telemetry.Init(ctx, otelCfg)
 	if err != nil {
-		log.Printf("Warning: OpenTelemetry init failed: %v", err)
+		slog.Warn("OpenTelemetry init failed", "error", err)
 	} else {
 		defer func() {
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer shutdownCancel()
 			if err := shutdownOTel(shutdownCtx); err != nil {
-				log.Printf("Error shutting down OpenTelemetry: %v", err)
+				slog.Error("Error shutting down OpenTelemetry", "error", err)
 			}
 		}()
 	}
@@ -54,23 +85,26 @@ func main() {
 	// Initialize Database Pool
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
-	log.Println("Connected to PostgreSQL successfully.")
+	slog.Info("Connected to PostgreSQL successfully")
 
 	if cfg.AutoMigrate {
-		log.Println("Applying database migrations (AUTO_MIGRATE=true)...")
+		slog.Info("Applying database migrations", "auto_migrate", true)
 		if err := db.Migrate(ctx, pool); err != nil {
-			log.Fatalf("Failed to apply database migrations: %v", err)
+			slog.Error("Failed to apply database migrations", "error", err)
+			os.Exit(1)
 		}
 	} else {
-		log.Println("Skipping automatic database migrations (AUTO_MIGRATE=false). Use 'migrate' CLI for migrations.")
+		slog.Info("Skipping automatic database migrations", "auto_migrate", false)
 	}
 
 	handler, err := newServerHandler(cfg, pool)
 	if err != nil {
-		log.Fatalf("Failed to initialize server handler: %v", err)
+		slog.Error("Failed to initialize server handler", "error", err)
+		os.Exit(1)
 	}
 
 	// Support HTTP/1.1 and HTTP/2 (TLS & h2c) natively via Go http.Protocols
@@ -99,29 +133,32 @@ func main() {
 		}
 
 		if hasTLS {
-			log.Printf("Pet Microservice listening on https://localhost:%s (TLS enabled via mkcert)", cfg.Port)
+			slog.Info("Pet Microservice listening", "url", "https://localhost:"+cfg.Port, "tls", true)
 			if err := srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("Server TLS error: %v", err)
+				slog.Error("Server TLS error", "error", err)
+				os.Exit(1)
 			}
 		} else {
-			log.Printf("Pet Microservice listening on http://localhost:%s (cleartext)", cfg.Port)
+			slog.Info("Pet Microservice listening", "url", "http://localhost:"+cfg.Port, "tls", false)
 			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("Server error: %v", err)
+				slog.Error("Server error", "error", err)
+				os.Exit(1)
 			}
 		}
 	}()
 
 	<-stop
-	log.Println("Shutting down Pet Microservice...")
+	slog.Info("Shutting down Pet Microservice...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced shutdown: %v", err)
+		slog.Error("Server forced shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server exited cleanly.")
+	slog.Info("Server exited cleanly")
 }
 
 func newServerHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, error) {

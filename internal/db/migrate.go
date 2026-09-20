@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -30,7 +30,11 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	for _, res := range results {
-		log.Printf("Applied migration %d: %s (%s)", res.Source.Version, res.Source.Path, res.Duration)
+		slog.Info("Applied migration",
+			"version", res.Source.Version,
+			"path", res.Source.Path,
+			"duration", res.Duration,
+		)
 	}
 
 	return nil
@@ -54,7 +58,11 @@ func MigrateDown(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	if res != nil {
-		log.Printf("Rolled back migration %d: %s (%s)", res.Source.Version, res.Source.Path, res.Duration)
+		slog.Info("Rolled back migration",
+			"version", res.Source.Version,
+			"path", res.Source.Path,
+			"duration", res.Duration,
+		)
 	}
 
 	return nil
@@ -102,7 +110,11 @@ func MigrateTo(ctx context.Context, pool *pgxpool.Pool, version int64) error {
 	}
 
 	for _, res := range results {
-		log.Printf("Applied migration %d: %s (%s)", res.Source.Version, res.Source.Path, res.Duration)
+		slog.Info("Applied migration",
+			"version", res.Source.Version,
+			"path", res.Source.Path,
+			"duration", res.Duration,
+		)
 	}
 
 	return nil
@@ -122,7 +134,11 @@ func MigrateDownTo(ctx context.Context, pool *pgxpool.Pool, version int64) error
 	}
 
 	for _, res := range results {
-		log.Printf("Rolled back migration %d: %s (%s)", res.Source.Version, res.Source.Path, res.Duration)
+		slog.Info("Rolled back migration",
+			"version", res.Source.Version,
+			"path", res.Source.Path,
+			"duration", res.Duration,
+		)
 	}
 
 	return nil
