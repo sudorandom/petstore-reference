@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file pet/v1/pet.proto.
  */
 export const file_pet_v1_pet: GenFile = /*@__PURE__*/
-  fileDesc("ChBwZXQvdjEvcGV0LnByb3RvEgZwZXQudjEiwQIKA1BldBIUCgJpZBgBIAEoCUIIukgFcgOwAQESFwoEbmFtZRgCIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAyABKAlCCbpIBnIEEAEYMhIWCgNhZ2UYBCABKAVCCbpIBhoEGGQoABIrCgZzdGF0dXMYBSABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARISCgpwaG90b191cmxzGAYgAygJEgwKBHRhZ3MYByADKAkSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLbW9kaWZpZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmNyZWF0ZWRfYnkYCiABKAkSEwoLbW9kaWZpZWRfYnkYCyABKAkirgEKEENyZWF0ZVBldFJlcXVlc3QSFwoEbmFtZRgBIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAiABKAlCCbpIBnIEEAEYMhIWCgNhZ2UYAyABKAVCCbpIBhoEGGQoABIrCgZzdGF0dXMYBCABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARISCgpwaG90b191cmxzGAUgAygJEgwKBHRhZ3MYBiADKAkiLQoRQ3JlYXRlUGV0UmVzcG9uc2USGAoDcGV0GAEgASgLMgsucGV0LnYxLlBldCIlCg1HZXRQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIqCg5HZXRQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0InoKD0xpc3RQZXRzUmVxdWVzdBIhCgZzdGF0dXMYASABKA4yES5wZXQudjEuUGV0U3RhdHVzEg8KB3NwZWNpZXMYAiABKAkSHAoJcGFnZV9zaXplGAMgASgFQgm6SAYaBBhkKAASFQoEcGFnZRgEIAEoBUIHukgEGgIoACJCChBMaXN0UGV0c1Jlc3BvbnNlEhkKBHBldHMYASADKAsyCy5wZXQudjEuUGV0EhMKC3RvdGFsX2NvdW50GAIgASgFIsQBChBVcGRhdGVQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIXCgRuYW1lGAIgASgJQgm6SAZyBBABGGQSGgoHc3BlY2llcxgDIAEoCUIJukgGcgQQARgyEhYKA2FnZRgEIAEoBUIJukgGGgQYZCgAEisKBnN0YXR1cxgFIAEoDjIRLnBldC52MS5QZXRTdGF0dXNCCLpIBYIBAhABEhIKCnBob3RvX3VybHMYBiADKAkSDAoEdGFncxgHIAMoCSItChFVcGRhdGVQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0IigKEERlbGV0ZVBldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKEURlbGV0ZVBldFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgqcQoJUGV0U3RhdHVzEhoKFlBFVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIYChRQRVRfU1RBVFVTX0FWQUlMQUJMRRABEhYKElBFVF9TVEFUVVNfUEVORElORxACEhYKElBFVF9TVEFUVVNfQURPUFRFRBADMsoCCgpQZXRTZXJ2aWNlEkAKCUNyZWF0ZVBldBIYLnBldC52MS5DcmVhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLkNyZWF0ZVBldFJlc3BvbnNlEjcKBkdldFBldBIVLnBldC52MS5HZXRQZXRSZXF1ZXN0GhYucGV0LnYxLkdldFBldFJlc3BvbnNlEj0KCExpc3RQZXRzEhcucGV0LnYxLkxpc3RQZXRzUmVxdWVzdBoYLnBldC52MS5MaXN0UGV0c1Jlc3BvbnNlEkAKCVVwZGF0ZVBldBIYLnBldC52MS5VcGRhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLlVwZGF0ZVBldFJlc3BvbnNlEkAKCURlbGV0ZVBldBIYLnBldC52MS5EZWxldGVQZXRSZXF1ZXN0GhkucGV0LnYxLkRlbGV0ZVBldFJlc3BvbnNlQi1aK2dpdGh1Yi5jb20vZXhhbXBsZS9wZXRzL2dlbi9nby9wZXQvdjE7cGV0djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("ChBwZXQvdjEvcGV0LnByb3RvEgZwZXQudjEi9wIKA1BldBIUCgJpZBgBIAEoCUIIukgFcgOwAQESFwoEbmFtZRgCIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAyABKAlCCbpIBnIEEAEYMhIuCgpiaXJ0aF9kYXRlGAQgASgJQhq6SBdyFTITXlxkezR9LVxkezJ9LVxkezJ9JBIrCgZzdGF0dXMYBSABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARISCgpwaG90b191cmxzGAYgAygJEgwKBHRhZ3MYByADKAkSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLbW9kaWZpZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmNyZWF0ZWRfYnkYCiABKAkSEwoLbW9kaWZpZWRfYnkYCyABKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYDCABKAgi5AEKEENyZWF0ZVBldFJlcXVlc3QSFwoEbmFtZRgBIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAiABKAlCCbpIBnIEEAEYMhIuCgpiaXJ0aF9kYXRlGAMgASgJQhq6SBdyFTITXlxkezR9LVxkezJ9LVxkezJ9JBIrCgZzdGF0dXMYBCABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARISCgpwaG90b191cmxzGAUgAygJEgwKBHRhZ3MYBiADKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYByABKAgiLQoRQ3JlYXRlUGV0UmVzcG9uc2USGAoDcGV0GAEgASgLMgsucGV0LnYxLlBldCIlCg1HZXRQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIqCg5HZXRQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0InoKD0xpc3RQZXRzUmVxdWVzdBIhCgZzdGF0dXMYASABKA4yES5wZXQudjEuUGV0U3RhdHVzEg8KB3NwZWNpZXMYAiABKAkSHAoJcGFnZV9zaXplGAMgASgFQgm6SAYaBBhkKAASFQoEcGFnZRgEIAEoBUIHukgEGgIoACJCChBMaXN0UGV0c1Jlc3BvbnNlEhkKBHBldHMYASADKAsyCy5wZXQudjEuUGV0EhMKC3RvdGFsX2NvdW50GAIgASgFIvoBChBVcGRhdGVQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIXCgRuYW1lGAIgASgJQgm6SAZyBBABGGQSGgoHc3BlY2llcxgDIAEoCUIJukgGcgQQARgyEi4KCmJpcnRoX2RhdGUYBCABKAlCGrpIF3IVMhNeXGR7NH0tXGR7Mn0tXGR7Mn0kEisKBnN0YXR1cxgFIAEoDjIRLnBldC52MS5QZXRTdGF0dXNCCLpIBYIBAhABEhIKCnBob3RvX3VybHMYBiADKAkSDAoEdGFncxgHIAMoCRIcChRiaXJ0aF9kYXRlX2VzdGltYXRlZBgIIAEoCCItChFVcGRhdGVQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0IigKEERlbGV0ZVBldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKEURlbGV0ZVBldFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgilQEKFVVwbG9hZFBldFBob3RvUmVxdWVzdBIYCgZwZXRfaWQYASABKAlCCLpIBXIDsAEBEhoKBGRhdGEYAiABKAxCDLpICXoHEAEYgIDAAhJGCgltaW1lX3R5cGUYAyABKAlCM7pIMHIuUgppbWFnZS9qcGVnUglpbWFnZS9wbmdSCmltYWdlL3dlYnBSCWltYWdlL2dpZiJXChZVcGxvYWRQZXRQaG90b1Jlc3BvbnNlEhAKCHBob3RvX2lkGAEgASgJEhEKCXBob3RvX3VybBgCIAEoCRIYCgNwZXQYAyABKAsyCy5wZXQudjEuUGV0IjAKEkdldFBldFBob3RvUmVxdWVzdBIaCghwaG90b19pZBgBIAEoCUIIukgFcgOwAQEiWAoTR2V0UGV0UGhvdG9SZXNwb25zZRIQCghwaG90b19pZBgBIAEoCRIOCgZwZXRfaWQYAiABKAkSDAoEZGF0YRgDIAEoDBIRCgltaW1lX3R5cGUYBCABKAkqcQoJUGV0U3RhdHVzEhoKFlBFVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIYChRQRVRfU1RBVFVTX0FWQUlMQUJMRRABEhYKElBFVF9TVEFUVVNfUEVORElORxACEhYKElBFVF9TVEFUVVNfQURPUFRFRBADMuMDCgpQZXRTZXJ2aWNlEkAKCUNyZWF0ZVBldBIYLnBldC52MS5DcmVhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLkNyZWF0ZVBldFJlc3BvbnNlEjcKBkdldFBldBIVLnBldC52MS5HZXRQZXRSZXF1ZXN0GhYucGV0LnYxLkdldFBldFJlc3BvbnNlEj0KCExpc3RQZXRzEhcucGV0LnYxLkxpc3RQZXRzUmVxdWVzdBoYLnBldC52MS5MaXN0UGV0c1Jlc3BvbnNlEkAKCVVwZGF0ZVBldBIYLnBldC52MS5VcGRhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLlVwZGF0ZVBldFJlc3BvbnNlEkAKCURlbGV0ZVBldBIYLnBldC52MS5EZWxldGVQZXRSZXF1ZXN0GhkucGV0LnYxLkRlbGV0ZVBldFJlc3BvbnNlEk8KDlVwbG9hZFBldFBob3RvEh0ucGV0LnYxLlVwbG9hZFBldFBob3RvUmVxdWVzdBoeLnBldC52MS5VcGxvYWRQZXRQaG90b1Jlc3BvbnNlEkYKC0dldFBldFBob3RvEhoucGV0LnYxLkdldFBldFBob3RvUmVxdWVzdBobLnBldC52MS5HZXRQZXRQaG90b1Jlc3BvbnNlQi1aK2dpdGh1Yi5jb20vZXhhbXBsZS9wZXRzL2dlbi9nby9wZXQvdjE7cGV0djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message pet.v1.Pet
@@ -35,9 +35,9 @@ export type Pet = Message<"pet.v1.Pet"> & {
   species: string;
 
   /**
-   * @generated from field: int32 age = 4;
+   * @generated from field: string birth_date = 4;
    */
-  age: number;
+  birthDate: string;
 
   /**
    * @generated from field: pet.v1.PetStatus status = 5;
@@ -73,6 +73,11 @@ export type Pet = Message<"pet.v1.Pet"> & {
    * @generated from field: string modified_by = 11;
    */
   modifiedBy: string;
+
+  /**
+   * @generated from field: bool birth_date_estimated = 12;
+   */
+  birthDateEstimated: boolean;
 };
 
 /**
@@ -97,9 +102,9 @@ export type CreatePetRequest = Message<"pet.v1.CreatePetRequest"> & {
   species: string;
 
   /**
-   * @generated from field: int32 age = 3;
+   * @generated from field: string birth_date = 3;
    */
-  age: number;
+  birthDate: string;
 
   /**
    * @generated from field: pet.v1.PetStatus status = 4;
@@ -115,6 +120,11 @@ export type CreatePetRequest = Message<"pet.v1.CreatePetRequest"> & {
    * @generated from field: repeated string tags = 6;
    */
   tags: string[];
+
+  /**
+   * @generated from field: bool birth_date_estimated = 7;
+   */
+  birthDateEstimated: boolean;
 };
 
 /**
@@ -257,9 +267,9 @@ export type UpdatePetRequest = Message<"pet.v1.UpdatePetRequest"> & {
   species: string;
 
   /**
-   * @generated from field: int32 age = 4;
+   * @generated from field: string birth_date = 4;
    */
-  age: number;
+  birthDate: string;
 
   /**
    * @generated from field: pet.v1.PetStatus status = 5;
@@ -275,6 +285,11 @@ export type UpdatePetRequest = Message<"pet.v1.UpdatePetRequest"> & {
    * @generated from field: repeated string tags = 7;
    */
   tags: string[];
+
+  /**
+   * @generated from field: bool birth_date_estimated = 8;
+   */
+  birthDateEstimated: boolean;
 };
 
 /**
@@ -334,6 +349,113 @@ export type DeletePetResponse = Message<"pet.v1.DeletePetResponse"> & {
  */
 export const DeletePetResponseSchema: GenMessage<DeletePetResponse> = /*@__PURE__*/
   messageDesc(file_pet_v1_pet, 10);
+
+/**
+ * @generated from message pet.v1.UploadPetPhotoRequest
+ */
+export type UploadPetPhotoRequest = Message<"pet.v1.UploadPetPhotoRequest"> & {
+  /**
+   * @generated from field: string pet_id = 1;
+   */
+  petId: string;
+
+  /**
+   * Photo binary data (up to 5MB)
+   *
+   * @generated from field: bytes data = 2;
+   */
+  data: Uint8Array;
+
+  /**
+   * Allowed image MIME types
+   *
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+};
+
+/**
+ * Describes the message pet.v1.UploadPetPhotoRequest.
+ * Use `create(UploadPetPhotoRequestSchema)` to create a new message.
+ */
+export const UploadPetPhotoRequestSchema: GenMessage<UploadPetPhotoRequest> = /*@__PURE__*/
+  messageDesc(file_pet_v1_pet, 11);
+
+/**
+ * @generated from message pet.v1.UploadPetPhotoResponse
+ */
+export type UploadPetPhotoResponse = Message<"pet.v1.UploadPetPhotoResponse"> & {
+  /**
+   * @generated from field: string photo_id = 1;
+   */
+  photoId: string;
+
+  /**
+   * @generated from field: string photo_url = 2;
+   */
+  photoUrl: string;
+
+  /**
+   * @generated from field: pet.v1.Pet pet = 3;
+   */
+  pet?: Pet;
+};
+
+/**
+ * Describes the message pet.v1.UploadPetPhotoResponse.
+ * Use `create(UploadPetPhotoResponseSchema)` to create a new message.
+ */
+export const UploadPetPhotoResponseSchema: GenMessage<UploadPetPhotoResponse> = /*@__PURE__*/
+  messageDesc(file_pet_v1_pet, 12);
+
+/**
+ * @generated from message pet.v1.GetPetPhotoRequest
+ */
+export type GetPetPhotoRequest = Message<"pet.v1.GetPetPhotoRequest"> & {
+  /**
+   * @generated from field: string photo_id = 1;
+   */
+  photoId: string;
+};
+
+/**
+ * Describes the message pet.v1.GetPetPhotoRequest.
+ * Use `create(GetPetPhotoRequestSchema)` to create a new message.
+ */
+export const GetPetPhotoRequestSchema: GenMessage<GetPetPhotoRequest> = /*@__PURE__*/
+  messageDesc(file_pet_v1_pet, 13);
+
+/**
+ * @generated from message pet.v1.GetPetPhotoResponse
+ */
+export type GetPetPhotoResponse = Message<"pet.v1.GetPetPhotoResponse"> & {
+  /**
+   * @generated from field: string photo_id = 1;
+   */
+  photoId: string;
+
+  /**
+   * @generated from field: string pet_id = 2;
+   */
+  petId: string;
+
+  /**
+   * @generated from field: bytes data = 3;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: string mime_type = 4;
+   */
+  mimeType: string;
+};
+
+/**
+ * Describes the message pet.v1.GetPetPhotoResponse.
+ * Use `create(GetPetPhotoResponseSchema)` to create a new message.
+ */
+export const GetPetPhotoResponseSchema: GenMessage<GetPetPhotoResponse> = /*@__PURE__*/
+  messageDesc(file_pet_v1_pet, 14);
 
 /**
  * @generated from enum pet.v1.PetStatus
@@ -409,6 +531,22 @@ export const PetService: GenService<{
     methodKind: "unary";
     input: typeof DeletePetRequestSchema;
     output: typeof DeletePetResponseSchema;
+  },
+  /**
+   * @generated from rpc pet.v1.PetService.UploadPetPhoto
+   */
+  uploadPetPhoto: {
+    methodKind: "unary";
+    input: typeof UploadPetPhotoRequestSchema;
+    output: typeof UploadPetPhotoResponseSchema;
+  },
+  /**
+   * @generated from rpc pet.v1.PetService.GetPetPhoto
+   */
+  getPetPhoto: {
+    methodKind: "unary";
+    input: typeof GetPetPhotoRequestSchema;
+    output: typeof GetPetPhotoResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_pet_v1_pet, 0);

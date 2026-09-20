@@ -1,0 +1,5 @@
+stubs:
+  - id: get-pet-photo-not-found
+    target: pet.v1.PetService/GetPetPhoto
+    error_code: 5
+    error_message: "photo not found: image data has expired or been removed"

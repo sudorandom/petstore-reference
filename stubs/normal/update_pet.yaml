@@ -1,0 +1,18 @@
+stubs:
+  - id: update-pet
+    target: pet.v1.PetService/UpdatePet
+    cel_content: |
+      {
+        'pet': {
+          'id': req.id,
+          'name': req.name,
+          'species': req.species,
+          'birth_date': req.birth_date,
+          'birth_date_estimated': req.birth_date_estimated,
+          'status': req.status,
+          'photo_urls': size(req.photo_urls) > 0 ? req.photo_urls : ['https://picsum.photos/seed/' + string(req.id) + '/400/400'],
+          'tags': req.tags,
+          'created_by': 'system',
+          'modified_by': 'system'
+        }
+      }

@@ -67,9 +67,9 @@ func (x *Pet) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 		e.FieldPrefix(&wrote, "species")
 		e.String(x.Species)
 	}
-	if x.Age != 0 {
-		e.FieldPrefix(&wrote, "age")
-		e.Int32(x.Age)
+	if x.BirthDate != "" {
+		e.FieldPrefix(&wrote, "birthDate")
+		e.String(x.BirthDate)
 	}
 	if x.Status != 0 {
 		e.FieldPrefix(&wrote, "status")
@@ -127,6 +127,10 @@ func (x *Pet) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 	if x.ModifiedBy != "" {
 		e.FieldPrefix(&wrote, "modifiedBy")
 		e.String(x.ModifiedBy)
+	}
+	if x.BirthDateEstimated {
+		e.FieldPrefix(&wrote, "birthDateEstimated")
+		e.Bool(x.BirthDateEstimated)
 	}
 	e.Byte('}')
 	return nil
@@ -201,7 +205,7 @@ func (x *Pet) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown b
 		}
 	}
 	{
-		status, err := d.MatchFast(&fastFirst, "age")
+		status, err := d.MatchFast(&fastFirst, "birthDate")
 		if err != nil {
 			return false, err
 		}
@@ -212,13 +216,13 @@ func (x *Pet) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown b
 			return false, nil
 		}
 		if d.ReadNull() {
-			x.Age = 0
+			x.BirthDate = ""
 		} else {
-			v, err := d.ReadInt32()
+			v, err := d.ReadString()
 			if err != nil {
 				return false, err
 			}
-			x.Age = v
+			x.BirthDate = v
 		}
 	}
 	{
@@ -410,6 +414,27 @@ func (x *Pet) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown b
 			x.ModifiedBy = v
 		}
 	}
+	{
+		status, err := d.MatchFast(&fastFirst, "birthDateEstimated")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.BirthDateEstimated = false
+		} else {
+			v, err := d.ReadBool()
+			if err != nil {
+				return false, err
+			}
+			x.BirthDateEstimated = v
+		}
+	}
 	done, err := d.TryEndObject()
 	if err != nil {
 		return false, err
@@ -424,7 +449,7 @@ func (x *Pet) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown b
 	if err := d.BeginObject(); err != nil {
 		return err
 	}
-	var seen [11]bool
+	var seen [12]bool
 	first := true
 	for {
 		key, ok, err := d.NextObjectKey(&first)
@@ -480,19 +505,19 @@ func (x *Pet) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown b
 				x.Species = v
 			}
 			continue
-		case "age":
+		case "birthDate", "birth_date":
 			if seen[3] {
 				return protojsonxgen.DuplicateField(key)
 			}
 			seen[3] = true
 			if d.ReadNull() {
-				x.Age = 0
+				x.BirthDate = ""
 			} else {
-				v, err := d.ReadInt32()
+				v, err := d.ReadString()
 				if err != nil {
 					return err
 				}
-				x.Age = v
+				x.BirthDate = v
 			}
 			continue
 		case "status":
@@ -642,6 +667,21 @@ func (x *Pet) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown b
 				x.ModifiedBy = v
 			}
 			continue
+		case "birthDateEstimated", "birth_date_estimated":
+			if seen[11] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[11] = true
+			if d.ReadNull() {
+				x.BirthDateEstimated = false
+			} else {
+				v, err := d.ReadBool()
+				if err != nil {
+					return err
+				}
+				x.BirthDateEstimated = v
+			}
+			continue
 		default:
 			if discardUnknown {
 				if err := d.SkipValue(); err != nil {
@@ -702,9 +742,9 @@ func (x *CreatePetRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 		e.FieldPrefix(&wrote, "species")
 		e.String(x.Species)
 	}
-	if x.Age != 0 {
-		e.FieldPrefix(&wrote, "age")
-		e.Int32(x.Age)
+	if x.BirthDate != "" {
+		e.FieldPrefix(&wrote, "birthDate")
+		e.String(x.BirthDate)
 	}
 	if x.Status != 0 {
 		e.FieldPrefix(&wrote, "status")
@@ -742,6 +782,10 @@ func (x *CreatePetRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 			e.String(v)
 		}
 		e.Byte(']')
+	}
+	if x.BirthDateEstimated {
+		e.FieldPrefix(&wrote, "birthDateEstimated")
+		e.Bool(x.BirthDateEstimated)
 	}
 	e.Byte('}')
 	return nil
@@ -795,7 +839,7 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 		}
 	}
 	{
-		status, err := d.MatchFast(&fastFirst, "age")
+		status, err := d.MatchFast(&fastFirst, "birthDate")
 		if err != nil {
 			return false, err
 		}
@@ -806,13 +850,13 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 			return false, nil
 		}
 		if d.ReadNull() {
-			x.Age = 0
+			x.BirthDate = ""
 		} else {
-			v, err := d.ReadInt32()
+			v, err := d.ReadString()
 			if err != nil {
 				return false, err
 			}
-			x.Age = v
+			x.BirthDate = v
 		}
 	}
 	{
@@ -920,6 +964,27 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 			x.Tags = values
 		}
 	}
+	{
+		status, err := d.MatchFast(&fastFirst, "birthDateEstimated")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.BirthDateEstimated = false
+		} else {
+			v, err := d.ReadBool()
+			if err != nil {
+				return false, err
+			}
+			x.BirthDateEstimated = v
+		}
+	}
 	done, err := d.TryEndObject()
 	if err != nil {
 		return false, err
@@ -934,7 +999,7 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 	if err := d.BeginObject(); err != nil {
 		return err
 	}
-	var seen [6]bool
+	var seen [7]bool
 	first := true
 	for {
 		key, ok, err := d.NextObjectKey(&first)
@@ -975,19 +1040,19 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 				x.Species = v
 			}
 			continue
-		case "age":
+		case "birthDate", "birth_date":
 			if seen[2] {
 				return protojsonxgen.DuplicateField(key)
 			}
 			seen[2] = true
 			if d.ReadNull() {
-				x.Age = 0
+				x.BirthDate = ""
 			} else {
-				v, err := d.ReadInt32()
+				v, err := d.ReadString()
 				if err != nil {
 					return err
 				}
-				x.Age = v
+				x.BirthDate = v
 			}
 			continue
 		case "status":
@@ -1075,6 +1140,21 @@ func (x *CreatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 					values = append(values, v)
 				}
 				x.Tags = values
+			}
+			continue
+		case "birthDateEstimated", "birth_date_estimated":
+			if seen[6] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[6] = true
+			if d.ReadNull() {
+				x.BirthDateEstimated = false
+			} else {
+				v, err := d.ReadBool()
+				if err != nil {
+					return err
+				}
+				x.BirthDateEstimated = v
 			}
 			continue
 		default:
@@ -2087,9 +2167,9 @@ func (x *UpdatePetRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 		e.FieldPrefix(&wrote, "species")
 		e.String(x.Species)
 	}
-	if x.Age != 0 {
-		e.FieldPrefix(&wrote, "age")
-		e.Int32(x.Age)
+	if x.BirthDate != "" {
+		e.FieldPrefix(&wrote, "birthDate")
+		e.String(x.BirthDate)
 	}
 	if x.Status != 0 {
 		e.FieldPrefix(&wrote, "status")
@@ -2127,6 +2207,10 @@ func (x *UpdatePetRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
 			e.String(v)
 		}
 		e.Byte(']')
+	}
+	if x.BirthDateEstimated {
+		e.FieldPrefix(&wrote, "birthDateEstimated")
+		e.Bool(x.BirthDateEstimated)
 	}
 	e.Byte('}')
 	return nil
@@ -2201,7 +2285,7 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 		}
 	}
 	{
-		status, err := d.MatchFast(&fastFirst, "age")
+		status, err := d.MatchFast(&fastFirst, "birthDate")
 		if err != nil {
 			return false, err
 		}
@@ -2212,13 +2296,13 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 			return false, nil
 		}
 		if d.ReadNull() {
-			x.Age = 0
+			x.BirthDate = ""
 		} else {
-			v, err := d.ReadInt32()
+			v, err := d.ReadString()
 			if err != nil {
 				return false, err
 			}
-			x.Age = v
+			x.BirthDate = v
 		}
 	}
 	{
@@ -2326,6 +2410,27 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, dis
 			x.Tags = values
 		}
 	}
+	{
+		status, err := d.MatchFast(&fastFirst, "birthDateEstimated")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.BirthDateEstimated = false
+		} else {
+			v, err := d.ReadBool()
+			if err != nil {
+				return false, err
+			}
+			x.BirthDateEstimated = v
+		}
+	}
 	done, err := d.TryEndObject()
 	if err != nil {
 		return false, err
@@ -2340,7 +2445,7 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 	if err := d.BeginObject(); err != nil {
 		return err
 	}
-	var seen [7]bool
+	var seen [8]bool
 	first := true
 	for {
 		key, ok, err := d.NextObjectKey(&first)
@@ -2396,19 +2501,19 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 				x.Species = v
 			}
 			continue
-		case "age":
+		case "birthDate", "birth_date":
 			if seen[3] {
 				return protojsonxgen.DuplicateField(key)
 			}
 			seen[3] = true
 			if d.ReadNull() {
-				x.Age = 0
+				x.BirthDate = ""
 			} else {
-				v, err := d.ReadInt32()
+				v, err := d.ReadString()
 				if err != nil {
 					return err
 				}
-				x.Age = v
+				x.BirthDate = v
 			}
 			continue
 		case "status":
@@ -2496,6 +2601,21 @@ func (x *UpdatePetRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, dis
 					values = append(values, v)
 				}
 				x.Tags = values
+			}
+			continue
+		case "birthDateEstimated", "birth_date_estimated":
+			if seen[7] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[7] = true
+			if d.ReadNull() {
+				x.BirthDateEstimated = false
+			} else {
+				v, err := d.ReadBool()
+				if err != nil {
+					return err
+				}
+				x.BirthDateEstimated = v
 			}
 			continue
 		default:
@@ -2900,6 +3020,816 @@ func (x *DeletePetResponse) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, di
 					return err
 				}
 				x.Success = v
+			}
+			continue
+		default:
+			if discardUnknown {
+				if err := d.SkipValue(); err != nil {
+					return err
+				}
+			} else {
+				return protojsonxgen.UnknownField(key)
+			}
+		}
+	}
+}
+
+func (x *UploadPetPhotoRequest) ProtoJSONXFastPath() {}
+
+func (x *UploadPetPhotoRequest) MarshalProtoJSONX() ([]byte, error) {
+	e := protojsonxgen.NewEncoder()
+	if err := x.marshalProtoJSONXTo(e); err != nil {
+		return nil, err
+	}
+	return e.Bytes(), nil
+}
+
+func (x *UploadPetPhotoRequest) UnmarshalProtoJSONX(data []byte) error {
+	return x.UnmarshalProtoJSONXWithOptions(data, false)
+}
+
+func (x *UploadPetPhotoRequest) UnmarshalProtoJSONXWithOptions(data []byte, discardUnknown bool) error {
+	d := protojsonxgen.NewDecoder(data)
+	*x = UploadPetPhotoRequest{}
+	firstKey, savedOff, savedDepth, _, peekErr := d.PeekObjectFieldName()
+	if peekErr != nil {
+		return peekErr
+	}
+	if firstKey == "petId" || firstKey == "" {
+		d.Reset(savedOff, savedDepth)
+		if ok, err := x.unmarshalProtoJSONXFast(d, discardUnknown); err != nil {
+			return err
+		} else if ok {
+			return d.Finish()
+		}
+		*x = UploadPetPhotoRequest{}
+	}
+	d.Reset(savedOff, savedDepth)
+	if err := x.unmarshalProtoJSONXFrom(d, discardUnknown); err != nil {
+		return err
+	}
+	return d.Finish()
+}
+
+func (x *UploadPetPhotoRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
+	e.Byte('{')
+	wrote := false
+	if x.PetId != "" {
+		e.FieldPrefix(&wrote, "petId")
+		e.String(x.PetId)
+	}
+	if len(x.Data) > 0 {
+		e.FieldPrefix(&wrote, "data")
+		e.BytesField(x.Data)
+	}
+	if x.MimeType != "" {
+		e.FieldPrefix(&wrote, "mimeType")
+		e.String(x.MimeType)
+	}
+	e.Byte('}')
+	return nil
+}
+
+func (x *UploadPetPhotoRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown bool) (bool, error) {
+	if err := d.BeginObject(); err != nil {
+		return false, err
+	}
+	fastFirst := true
+	{
+		status, err := d.MatchFast(&fastFirst, "petId")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PetId = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PetId = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "data")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.Data = nil
+		} else {
+			v, err := d.ReadBytes()
+			if err != nil {
+				return false, err
+			}
+			x.Data = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "mimeType")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.MimeType = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.MimeType = v
+		}
+	}
+	done, err := d.TryEndObject()
+	if err != nil {
+		return false, err
+	}
+	if !done {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (x *UploadPetPhotoRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown bool) error {
+	if err := d.BeginObject(); err != nil {
+		return err
+	}
+	var seen [3]bool
+	first := true
+	for {
+		key, ok, err := d.NextObjectKey(&first)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		switch key {
+		case "petId", "pet_id":
+			if seen[0] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[0] = true
+			if d.ReadNull() {
+				x.PetId = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PetId = v
+			}
+			continue
+		case "data":
+			if seen[1] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[1] = true
+			if d.ReadNull() {
+				x.Data = nil
+			} else {
+				v, err := d.ReadBytes()
+				if err != nil {
+					return err
+				}
+				x.Data = v
+			}
+			continue
+		case "mimeType", "mime_type":
+			if seen[2] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[2] = true
+			if d.ReadNull() {
+				x.MimeType = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.MimeType = v
+			}
+			continue
+		default:
+			if discardUnknown {
+				if err := d.SkipValue(); err != nil {
+					return err
+				}
+			} else {
+				return protojsonxgen.UnknownField(key)
+			}
+		}
+	}
+}
+
+func (x *UploadPetPhotoResponse) ProtoJSONXFastPath() {}
+
+func (x *UploadPetPhotoResponse) MarshalProtoJSONX() ([]byte, error) {
+	e := protojsonxgen.NewEncoder()
+	if err := x.marshalProtoJSONXTo(e); err != nil {
+		return nil, err
+	}
+	return e.Bytes(), nil
+}
+
+func (x *UploadPetPhotoResponse) UnmarshalProtoJSONX(data []byte) error {
+	return x.UnmarshalProtoJSONXWithOptions(data, false)
+}
+
+func (x *UploadPetPhotoResponse) UnmarshalProtoJSONXWithOptions(data []byte, discardUnknown bool) error {
+	d := protojsonxgen.NewDecoder(data)
+	*x = UploadPetPhotoResponse{}
+	firstKey, savedOff, savedDepth, _, peekErr := d.PeekObjectFieldName()
+	if peekErr != nil {
+		return peekErr
+	}
+	if firstKey == "photoId" || firstKey == "" {
+		d.Reset(savedOff, savedDepth)
+		if ok, err := x.unmarshalProtoJSONXFast(d, discardUnknown); err != nil {
+			return err
+		} else if ok {
+			return d.Finish()
+		}
+		*x = UploadPetPhotoResponse{}
+	}
+	d.Reset(savedOff, savedDepth)
+	if err := x.unmarshalProtoJSONXFrom(d, discardUnknown); err != nil {
+		return err
+	}
+	return d.Finish()
+}
+
+func (x *UploadPetPhotoResponse) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
+	e.Byte('{')
+	wrote := false
+	if x.PhotoId != "" {
+		e.FieldPrefix(&wrote, "photoId")
+		e.String(x.PhotoId)
+	}
+	if x.PhotoUrl != "" {
+		e.FieldPrefix(&wrote, "photoUrl")
+		e.String(x.PhotoUrl)
+	}
+	if x.Pet != nil {
+		e.FieldPrefix(&wrote, "pet")
+		if fast, ok := any(x.Pet).(interface {
+			marshalProtoJSONXTo(*protojsonxgen.Encoder) error
+		}); ok {
+			if err := fast.marshalProtoJSONXTo(e); err != nil {
+				return err
+			}
+		} else {
+			if err := protojsonxgen.MarshalField(e, x.Pet); err != nil {
+				return err
+			}
+		}
+	}
+	e.Byte('}')
+	return nil
+}
+
+func (x *UploadPetPhotoResponse) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown bool) (bool, error) {
+	if err := d.BeginObject(); err != nil {
+		return false, err
+	}
+	fastFirst := true
+	{
+		status, err := d.MatchFast(&fastFirst, "photoId")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PhotoId = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PhotoId = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "photoUrl")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PhotoUrl = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PhotoUrl = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "pet")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.Pet = nil
+		} else {
+			x.Pet = &Pet{}
+			if fast, ok := any(x.Pet).(interface {
+				unmarshalProtoJSONXFast(*protojsonxgen.Decoder, bool) (bool, error)
+			}); ok {
+				if ok, err := fast.unmarshalProtoJSONXFast(d, discardUnknown); err != nil {
+					return false, err
+				} else if !ok {
+					return false, nil
+				}
+			} else {
+				if err := protojsonxgen.UnmarshalField(d, x.Pet, discardUnknown); err != nil {
+					return false, err
+				}
+			}
+		}
+	}
+	done, err := d.TryEndObject()
+	if err != nil {
+		return false, err
+	}
+	if !done {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (x *UploadPetPhotoResponse) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown bool) error {
+	if err := d.BeginObject(); err != nil {
+		return err
+	}
+	var seen [3]bool
+	first := true
+	for {
+		key, ok, err := d.NextObjectKey(&first)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		switch key {
+		case "photoId", "photo_id":
+			if seen[0] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[0] = true
+			if d.ReadNull() {
+				x.PhotoId = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PhotoId = v
+			}
+			continue
+		case "photoUrl", "photo_url":
+			if seen[1] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[1] = true
+			if d.ReadNull() {
+				x.PhotoUrl = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PhotoUrl = v
+			}
+			continue
+		case "pet":
+			if seen[2] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[2] = true
+			if d.ReadNull() {
+				x.Pet = nil
+			} else {
+				x.Pet = &Pet{}
+				if slow, ok := any(x.Pet).(interface {
+					unmarshalProtoJSONXFrom(*protojsonxgen.Decoder, bool) error
+				}); ok {
+					if err := slow.unmarshalProtoJSONXFrom(d, discardUnknown); err != nil {
+						return err
+					}
+				} else {
+					if err := protojsonxgen.UnmarshalField(d, x.Pet, discardUnknown); err != nil {
+						return err
+					}
+				}
+			}
+			continue
+		default:
+			if discardUnknown {
+				if err := d.SkipValue(); err != nil {
+					return err
+				}
+			} else {
+				return protojsonxgen.UnknownField(key)
+			}
+		}
+	}
+}
+
+func (x *GetPetPhotoRequest) ProtoJSONXFastPath() {}
+
+func (x *GetPetPhotoRequest) MarshalProtoJSONX() ([]byte, error) {
+	e := protojsonxgen.NewEncoder()
+	if err := x.marshalProtoJSONXTo(e); err != nil {
+		return nil, err
+	}
+	return e.Bytes(), nil
+}
+
+func (x *GetPetPhotoRequest) UnmarshalProtoJSONX(data []byte) error {
+	return x.UnmarshalProtoJSONXWithOptions(data, false)
+}
+
+func (x *GetPetPhotoRequest) UnmarshalProtoJSONXWithOptions(data []byte, discardUnknown bool) error {
+	d := protojsonxgen.NewDecoder(data)
+	*x = GetPetPhotoRequest{}
+	firstKey, savedOff, savedDepth, _, peekErr := d.PeekObjectFieldName()
+	if peekErr != nil {
+		return peekErr
+	}
+	if firstKey == "photoId" || firstKey == "" {
+		d.Reset(savedOff, savedDepth)
+		if ok, err := x.unmarshalProtoJSONXFast(d, discardUnknown); err != nil {
+			return err
+		} else if ok {
+			return d.Finish()
+		}
+		*x = GetPetPhotoRequest{}
+	}
+	d.Reset(savedOff, savedDepth)
+	if err := x.unmarshalProtoJSONXFrom(d, discardUnknown); err != nil {
+		return err
+	}
+	return d.Finish()
+}
+
+func (x *GetPetPhotoRequest) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
+	e.Byte('{')
+	wrote := false
+	if x.PhotoId != "" {
+		e.FieldPrefix(&wrote, "photoId")
+		e.String(x.PhotoId)
+	}
+	e.Byte('}')
+	return nil
+}
+
+func (x *GetPetPhotoRequest) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown bool) (bool, error) {
+	if err := d.BeginObject(); err != nil {
+		return false, err
+	}
+	fastFirst := true
+	{
+		status, err := d.MatchFast(&fastFirst, "photoId")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PhotoId = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PhotoId = v
+		}
+	}
+	done, err := d.TryEndObject()
+	if err != nil {
+		return false, err
+	}
+	if !done {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (x *GetPetPhotoRequest) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown bool) error {
+	if err := d.BeginObject(); err != nil {
+		return err
+	}
+	var seen [1]bool
+	first := true
+	for {
+		key, ok, err := d.NextObjectKey(&first)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		switch key {
+		case "photoId", "photo_id":
+			if seen[0] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[0] = true
+			if d.ReadNull() {
+				x.PhotoId = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PhotoId = v
+			}
+			continue
+		default:
+			if discardUnknown {
+				if err := d.SkipValue(); err != nil {
+					return err
+				}
+			} else {
+				return protojsonxgen.UnknownField(key)
+			}
+		}
+	}
+}
+
+func (x *GetPetPhotoResponse) ProtoJSONXFastPath() {}
+
+func (x *GetPetPhotoResponse) MarshalProtoJSONX() ([]byte, error) {
+	e := protojsonxgen.NewEncoder()
+	if err := x.marshalProtoJSONXTo(e); err != nil {
+		return nil, err
+	}
+	return e.Bytes(), nil
+}
+
+func (x *GetPetPhotoResponse) UnmarshalProtoJSONX(data []byte) error {
+	return x.UnmarshalProtoJSONXWithOptions(data, false)
+}
+
+func (x *GetPetPhotoResponse) UnmarshalProtoJSONXWithOptions(data []byte, discardUnknown bool) error {
+	d := protojsonxgen.NewDecoder(data)
+	*x = GetPetPhotoResponse{}
+	firstKey, savedOff, savedDepth, _, peekErr := d.PeekObjectFieldName()
+	if peekErr != nil {
+		return peekErr
+	}
+	if firstKey == "photoId" || firstKey == "" {
+		d.Reset(savedOff, savedDepth)
+		if ok, err := x.unmarshalProtoJSONXFast(d, discardUnknown); err != nil {
+			return err
+		} else if ok {
+			return d.Finish()
+		}
+		*x = GetPetPhotoResponse{}
+	}
+	d.Reset(savedOff, savedDepth)
+	if err := x.unmarshalProtoJSONXFrom(d, discardUnknown); err != nil {
+		return err
+	}
+	return d.Finish()
+}
+
+func (x *GetPetPhotoResponse) marshalProtoJSONXTo(e *protojsonxgen.Encoder) error {
+	e.Byte('{')
+	wrote := false
+	if x.PhotoId != "" {
+		e.FieldPrefix(&wrote, "photoId")
+		e.String(x.PhotoId)
+	}
+	if x.PetId != "" {
+		e.FieldPrefix(&wrote, "petId")
+		e.String(x.PetId)
+	}
+	if len(x.Data) > 0 {
+		e.FieldPrefix(&wrote, "data")
+		e.BytesField(x.Data)
+	}
+	if x.MimeType != "" {
+		e.FieldPrefix(&wrote, "mimeType")
+		e.String(x.MimeType)
+	}
+	e.Byte('}')
+	return nil
+}
+
+func (x *GetPetPhotoResponse) unmarshalProtoJSONXFast(d *protojsonxgen.Decoder, discardUnknown bool) (bool, error) {
+	if err := d.BeginObject(); err != nil {
+		return false, err
+	}
+	fastFirst := true
+	{
+		status, err := d.MatchFast(&fastFirst, "photoId")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PhotoId = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PhotoId = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "petId")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.PetId = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.PetId = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "data")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.Data = nil
+		} else {
+			v, err := d.ReadBytes()
+			if err != nil {
+				return false, err
+			}
+			x.Data = v
+		}
+	}
+	{
+		status, err := d.MatchFast(&fastFirst, "mimeType")
+		if err != nil {
+			return false, err
+		}
+		if status == 0 {
+			return true, nil
+		}
+		if status < 0 {
+			return false, nil
+		}
+		if d.ReadNull() {
+			x.MimeType = ""
+		} else {
+			v, err := d.ReadString()
+			if err != nil {
+				return false, err
+			}
+			x.MimeType = v
+		}
+	}
+	done, err := d.TryEndObject()
+	if err != nil {
+		return false, err
+	}
+	if !done {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (x *GetPetPhotoResponse) unmarshalProtoJSONXFrom(d *protojsonxgen.Decoder, discardUnknown bool) error {
+	if err := d.BeginObject(); err != nil {
+		return err
+	}
+	var seen [4]bool
+	first := true
+	for {
+		key, ok, err := d.NextObjectKey(&first)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		switch key {
+		case "photoId", "photo_id":
+			if seen[0] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[0] = true
+			if d.ReadNull() {
+				x.PhotoId = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PhotoId = v
+			}
+			continue
+		case "petId", "pet_id":
+			if seen[1] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[1] = true
+			if d.ReadNull() {
+				x.PetId = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.PetId = v
+			}
+			continue
+		case "data":
+			if seen[2] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[2] = true
+			if d.ReadNull() {
+				x.Data = nil
+			} else {
+				v, err := d.ReadBytes()
+				if err != nil {
+					return err
+				}
+				x.Data = v
+			}
+			continue
+		case "mimeType", "mime_type":
+			if seen[3] {
+				return protojsonxgen.DuplicateField(key)
+			}
+			seen[3] = true
+			if d.ReadNull() {
+				x.MimeType = ""
+			} else {
+				v, err := d.ReadString()
+				if err != nil {
+					return err
+				}
+				x.MimeType = v
 			}
 			continue
 		default:

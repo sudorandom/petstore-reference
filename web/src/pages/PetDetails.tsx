@@ -1,27 +1,19 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@connectrpc/connect-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { PetService } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
-
-function formatDate(ts?: { seconds: bigint }): string {
-  if (!ts || !ts.seconds) return 'N/A';
-  const d = new Date(Number(ts.seconds) * 1000);
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
+import { formatTimestamp, formatBirthDate, calculateAge } from '../lib/date';
 
 export const PetDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     PetService.method.getPet,
@@ -39,7 +31,55 @@ export const PetDetails: React.FC = () => {
     },
   });
 
+  const uploadPhotoMutation = useMutation(PetService.method.uploadPetPhoto, {
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setUploadError(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    onError: (err) => {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setUploadError(msg);
+    },
+  });
+
   const pet = data?.pet;
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pet) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Photo must be less than 5MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Photo must be a JPEG, PNG, WebP, or GIF image.');
+      e.target.value = '';
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      await uploadPhotoMutation.mutateAsync({
+        petId: pet.id,
+        data: new Uint8Array(buffer),
+        mimeType: file.type,
+      });
+    } catch (err: any) {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setUploadError(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleDelete = () => {
     if (pet && confirm(`Are you sure you want to delete ${pet.name}?`)) {
@@ -69,11 +109,11 @@ export const PetDetails: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          <h2 style={{ color: '#f87171', fontSize: '1.15rem', marginBottom: '0.5rem' }}>
-            Pet Not Found
+          <h2 style={{ color: 'var(--danger)', fontSize: '1.15rem', marginBottom: '0.5rem' }}>
+            Failed to Load Pet
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-            {error?.message || 'The requested pet could not be loaded.'}
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+            {error?.message || 'Pet not found or server error'}
           </p>
           <Link to="/" className="btn btn-secondary">
             ← Back to Directory
@@ -90,8 +130,8 @@ export const PetDetails: React.FC = () => {
   return (
     <Layout
       breadcrumbs={[
-        { label: 'Pets', href: '/' },
-        { label: pet.name },
+        { label: 'Directory', href: '/' },
+        { label: pet.name || 'Pet Details' },
       ]}
     >
       <div
@@ -106,11 +146,12 @@ export const PetDetails: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#f8fafc' }}>{pet.name}</h1>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-contrast)' }}>{pet.name}</h1>
             <span className={`status-badge ${statusClass}`}>{statusName}</span>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            {pet.species} • {pet.age} {pet.age === 1 ? 'year old' : 'years old'}
+            {pet.species}
+            {pet.birthDate && ` • ${calculateAge(pet.birthDate)}`}
           </p>
         </div>
 
@@ -162,7 +203,7 @@ export const PetDetails: React.FC = () => {
             style={{
               fontSize: '1.1rem',
               fontWeight: 600,
-              color: '#f8fafc',
+              color: 'var(--text-contrast)',
               marginBottom: '1.25rem',
               borderBottom: '1px solid var(--border)',
               paddingBottom: '0.75rem',
@@ -183,8 +224,8 @@ export const PetDetails: React.FC = () => {
             <div>
               <code
                 style={{
-                  color: '#cbd5e1',
-                  background: '#0f172a',
+                  color: 'var(--text-primary)',
+                  background: 'var(--badge-bg)',
                   padding: '0.15rem 0.4rem',
                   borderRadius: '4px',
                   fontSize: '0.8rem',
@@ -195,15 +236,20 @@ export const PetDetails: React.FC = () => {
             </div>
 
             <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Species</div>
-            <div style={{ color: '#f8fafc' }}>{pet.species}</div>
+            <div style={{ color: 'var(--text-contrast)' }}>{pet.species}</div>
 
-            <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Age</div>
-            <div style={{ color: '#f8fafc' }}>
-              {pet.age} {pet.age === 1 ? 'year' : 'years'}
+            <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Birth Date</div>
+            <div style={{ color: 'var(--text-contrast)' }}>
+              {formatBirthDate(pet.birthDate, pet.birthDateEstimated)}
+              {pet.birthDate && (
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem' }}>
+                  ({calculateAge(pet.birthDate)})
+                </span>
+              )}
             </div>
 
             <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Status</div>
-            <div style={{ color: '#f8fafc' }}>{statusName}</div>
+            <div style={{ color: 'var(--text-contrast)' }}>{statusName}</div>
 
             <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Tags</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
@@ -212,9 +258,9 @@ export const PetDetails: React.FC = () => {
                   <span
                     key={i}
                     style={{
-                      background: '#0f172a',
+                      background: 'var(--badge-bg)',
                       border: '1px solid var(--border)',
-                      color: '#cbd5e1',
+                      color: 'var(--text-primary)',
                       padding: '0.15rem 0.5rem',
                       borderRadius: '4px',
                       fontSize: '0.8rem',
@@ -228,24 +274,66 @@ export const PetDetails: React.FC = () => {
               )}
             </div>
 
-            <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Photo URLs</div>
+            <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Photos</div>
             <div>
               {pet.photoUrls && pet.photoUrls.length > 0 ? (
-                pet.photoUrls.map((url, i) => (
-                  <div key={i} style={{ marginBottom: '0.35rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+                  {pet.photoUrls.map((url, i) => (
                     <a
+                      key={i}
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#38bdf8', textDecoration: 'none', wordBreak: 'break-all' }}
+                      style={{
+                        display: 'block',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        backgroundColor: 'var(--bg-secondary)',
+                      }}
+                      title="View full image"
                     >
-                      {url}
+                      <img
+                        src={url}
+                        alt={`${pet.name} photo ${i + 1}`}
+                        style={{
+                          width: '120px',
+                          height: '120px',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
                     </a>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No photos</span>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                  No photos uploaded yet.
+                </div>
               )}
+
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handlePhotoUpload}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploading ? 'Uploading...' : '📷 Upload Photo'}
+                </button>
+                {uploadError && (
+                  <div style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    {uploadError}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -256,7 +344,7 @@ export const PetDetails: React.FC = () => {
             style={{
               fontSize: '1.1rem',
               fontWeight: 600,
-              color: '#f8fafc',
+              color: 'var(--text-contrast)',
               marginBottom: '1.25rem',
               borderBottom: '1px solid var(--border)',
               paddingBottom: '0.75rem',
@@ -278,7 +366,7 @@ export const PetDetails: React.FC = () => {
               >
                 Created By
               </div>
-              <div style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
+              <div style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                 {pet.createdBy || 'unknown'}
               </div>
             </div>
@@ -295,7 +383,7 @@ export const PetDetails: React.FC = () => {
               >
                 Created At
               </div>
-              <div style={{ color: '#cbd5e1' }}>{formatDate(pet.createdAt)}</div>
+              <div style={{ color: 'var(--text-primary)' }}>{formatTimestamp(pet.createdAt)}</div>
             </div>
 
             <div>
@@ -310,7 +398,7 @@ export const PetDetails: React.FC = () => {
               >
                 Modified By
               </div>
-              <div style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
+              <div style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                 {pet.modifiedBy || 'unknown'}
               </div>
             </div>
@@ -327,7 +415,7 @@ export const PetDetails: React.FC = () => {
               >
                 Modified At
               </div>
-              <div style={{ color: '#cbd5e1' }}>{formatDate(pet.modifiedAt)}</div>
+              <div style={{ color: 'var(--text-primary)' }}>{formatTimestamp(pet.modifiedAt)}</div>
             </div>
           </div>
         </div>

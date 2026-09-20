@@ -4,18 +4,7 @@ import { useQuery, useMutation } from '@connectrpc/connect-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { PetService } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
-
-function formatDate(ts?: { seconds: bigint }): string {
-  if (!ts || !ts.seconds) return '';
-  const d = new Date(Number(ts.seconds) * 1000);
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatTimestamp, calculateAge } from '../lib/date';
 
 export const PetList: React.FC = () => {
   const queryClient = useQueryClient();
@@ -75,7 +64,7 @@ export const PetList: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#f8fafc' }}>Pets Directory</h1>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-contrast)' }}>Pets Directory</h1>
             <span className="badge">
               {filteredPets.length} {filteredPets.length === 1 ? 'pet' : 'pets'}
             </span>
@@ -196,8 +185,8 @@ export const PetList: React.FC = () => {
               pet.status === 1 ? 'Available' : pet.status === 2 ? 'Pending' : 'Adopted';
             const createdBy = pet.createdBy || 'unknown';
             const modifiedBy = pet.modifiedBy || 'unknown';
-            const createdDate = formatDate(pet.createdAt);
-            const modifiedDate = formatDate(pet.modifiedAt);
+            const createdDate = formatTimestamp(pet.createdAt);
+            const modifiedDate = formatTimestamp(pet.modifiedAt);
 
             return (
               <div key={pet.id} className="pet-item">
@@ -259,10 +248,15 @@ export const PetList: React.FC = () => {
 
                 <div className="pet-details-row">
                   <span>{pet.species}</span>
-                  <span className="meta-dot">·</span>
-                  <span>
-                    {pet.age} {pet.age === 1 ? 'year old' : 'years old'}
-                  </span>
+                  {pet.birthDate && (
+                    <>
+                      <span className="meta-dot">·</span>
+                      <span>
+                        {calculateAge(pet.birthDate)}
+                        {pet.birthDateEstimated && ' (est.)'}
+                      </span>
+                    </>
+                  )}
                   {pet.tags && pet.tags.length > 0 && (
                     <>
                       <span className="meta-dot">·</span>
@@ -271,9 +265,9 @@ export const PetList: React.FC = () => {
                           <span
                             key={i}
                             style={{
-                              background: '#0f172a',
+                              background: 'var(--badge-bg)',
                               border: '1px solid var(--border)',
-                              color: '#94a3b8',
+                              color: 'var(--text-secondary)',
                               padding: '0.05rem 0.4rem',
                               borderRadius: '4px',
                               fontSize: '0.75rem',

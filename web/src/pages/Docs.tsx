@@ -31,18 +31,18 @@ export const Docs: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', overflow: 'hidden' }}>
       <div
         style={{
-          background: '#0f172a',
-          color: '#f8fafc',
+          background: 'var(--bg-secondary)',
+          color: 'var(--text-primary)',
           padding: '0.6rem 1.2rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: '1px solid #334155',
+          borderBottom: '1px solid var(--border-primary)',
           fontSize: '0.85rem',
           flexShrink: 0,
         }}
       >
-        <Link to="/" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 500 }}>
+        <Link to="/" style={{ color: 'var(--accent-secondary)', textDecoration: 'none', fontWeight: 500 }}>
           ← Back to Petstore UI
         </Link>
         <div>
@@ -52,7 +52,7 @@ export const Docs: React.FC = () => {
             href="/openapi.yaml"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: '#38bdf8', textDecoration: 'none' }}
+            style={{ color: 'var(--accent-secondary)', textDecoration: 'none' }}
           >
             Download openapi.yaml
           </a>

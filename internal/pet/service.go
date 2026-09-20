@@ -3,7 +3,12 @@ package pet
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -43,15 +48,23 @@ func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.Crea
 
 	callerEmail := auth.UserEmailFromContext(ctx)
 
+	var birthDate pgtype.Date
+	t, err := time.Parse("2006-01-02", msg.BirthDate)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid birth_date format, expected YYYY-MM-DD"))
+	}
+	birthDate = pgtype.Date{Time: t, Valid: true}
+
 	created, err := s.queries.CreatePet(ctx, db.CreatePetParams{
-		Name:       msg.Name,
-		Species:    msg.Species,
-		Age:        msg.Age,
-		Status:     msg.Status.String(),
-		PhotoUrls:  photoUrls,
-		Tags:       tags,
-		CreatedBy:  callerEmail,
-		ModifiedBy: callerEmail,
+		Name:               msg.Name,
+		Species:            msg.Species,
+		BirthDate:          birthDate,
+		BirthDateEstimated: msg.BirthDateEstimated,
+		Status:             msg.Status.String(),
+		PhotoUrls:          photoUrls,
+		Tags:               tags,
+		CreatedBy:          callerEmail,
+		ModifiedBy:         callerEmail,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -160,15 +173,23 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 
 	callerEmail := auth.UserEmailFromContext(ctx)
 
+	var birthDate pgtype.Date
+	t, err := time.Parse("2006-01-02", msg.BirthDate)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid birth_date format, expected YYYY-MM-DD"))
+	}
+	birthDate = pgtype.Date{Time: t, Valid: true}
+
 	updated, err := s.queries.UpdatePet(ctx, db.UpdatePetParams{
-		ID:         uid,
-		Name:       msg.Name,
-		Species:    msg.Species,
-		Age:        msg.Age,
-		Status:     msg.Status.String(),
-		PhotoUrls:  photoUrls,
-		Tags:       tags,
-		ModifiedBy: callerEmail,
+		ID:                 uid,
+		Name:               msg.Name,
+		Species:            msg.Species,
+		BirthDate:          birthDate,
+		BirthDateEstimated: msg.BirthDateEstimated,
+		Status:             msg.Status.String(),
+		PhotoUrls:          photoUrls,
+		Tags:               tags,
+		ModifiedBy:         callerEmail,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -197,21 +218,101 @@ func (s *Service) DeletePet(ctx context.Context, req *connect.Request[petv1.Dele
 	}), nil
 }
 
+func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1.UploadPetPhotoRequest]) (*connect.Response[petv1.UploadPetPhotoResponse], error) {
+	msg := req.Msg
+
+	var petUID pgtype.UUID
+	if err := petUID.Scan(msg.PetId); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
+	}
+
+	// Verify pet exists
+	_, err := s.queries.GetPet(ctx, petUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("pet not found"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	callerEmail := auth.UserEmailFromContext(ctx)
+
+	if len(msg.Data) > 5*1024*1024 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("photo exceeds maximum allowed size"))
+	}
+
+	createdPhoto, err := s.queries.CreatePetPhoto(ctx, db.CreatePetPhotoParams{
+		PetID:     petUID,
+		Data:      msg.Data,
+		MimeType:  msg.MimeType,
+		SizeBytes: int32(len(msg.Data)), //nolint:gosec // G115: verified <= 5MB
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to store pet photo: %w", err))
+	}
+
+	photoID := uuid.UUID(createdPhoto.ID.Bytes).String()
+	photoURL := fmt.Sprintf("/photos/%s", photoID)
+
+	updatedPet, err := s.queries.AddPetPhotoURL(ctx, db.AddPetPhotoURLParams{
+		ID:         petUID,
+		PhotoUrl:   photoURL,
+		ModifiedBy: callerEmail,
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update pet photo list: %w", err))
+	}
+
+	return connect.NewResponse(&petv1.UploadPetPhotoResponse{
+		PhotoId:  photoID,
+		PhotoUrl: photoURL,
+		Pet:      toProtoPet(updatedPet),
+	}), nil
+}
+
+func (s *Service) GetPetPhoto(ctx context.Context, req *connect.Request[petv1.GetPetPhotoRequest]) (*connect.Response[petv1.GetPetPhotoResponse], error) {
+	var photoUID pgtype.UUID
+	if err := photoUID.Scan(req.Msg.PhotoId); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid photo UUID"))
+	}
+
+	photo, err := s.queries.GetPetPhoto(ctx, photoUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("photo not found"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&petv1.GetPetPhotoResponse{
+		PhotoId:  uuid.UUID(photo.ID.Bytes).String(),
+		PetId:    uuid.UUID(photo.PetID.Bytes).String(),
+		Data:     photo.Data,
+		MimeType: photo.MimeType,
+	}), nil
+}
+
 func toProtoPet(p db.Pet) *petv1.Pet {
 	statusVal := petv1.PetStatus_value[p.Status]
 
 	petID := uuid.UUID(p.ID.Bytes).String()
 
+	var birthDateStr string
+	if p.BirthDate.Valid {
+		birthDateStr = p.BirthDate.Time.Format("2006-01-02")
+	}
+
 	protoPet := &petv1.Pet{
-		Id:         petID,
-		Name:       p.Name,
-		Species:    p.Species,
-		Age:        p.Age,
-		Status:     petv1.PetStatus(statusVal),
-		PhotoUrls:  p.PhotoUrls,
-		Tags:       p.Tags,
-		CreatedBy:  p.CreatedBy,
-		ModifiedBy: p.ModifiedBy,
+		Id:                  petID,
+		Name:                p.Name,
+		Species:             p.Species,
+		BirthDate:           birthDateStr,
+		BirthDateEstimated:  p.BirthDateEstimated,
+		Status:              petv1.PetStatus(statusVal),
+		PhotoUrls:           p.PhotoUrls,
+		Tags:                p.Tags,
+		CreatedBy:           p.CreatedBy,
+		ModifiedBy:          p.ModifiedBy,
 	}
 
 	if p.CreatedAt.Valid {
@@ -222,4 +323,42 @@ func toProtoPet(p db.Pet) *petv1.Pet {
 	}
 
 	return protoPet
+}
+
+// NewPhotoHandler returns an http.Handler that serves pet photos by ID at /photos/{id}.
+func NewPhotoHandler(queries *db.Queries) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		idStr := strings.TrimPrefix(r.URL.Path, "/photos/")
+		if idStr == "" {
+			http.NotFound(w, r)
+			return
+		}
+		var photoUID pgtype.UUID
+		if err := photoUID.Scan(idStr); err != nil {
+			http.Error(w, "Invalid photo ID", http.StatusBadRequest)
+			return
+		}
+		if queries == nil {
+			http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		photo, err := queries.GetPetPhoto(r.Context(), photoUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.NotFound(w, r)
+				return
+			}
+			http.Error(w, "Failed to load photo", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", photo.MimeType)
+		w.Header().Set("Content-Length", strconv.Itoa(len(photo.Data)))
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(photo.Data)
+	})
 }

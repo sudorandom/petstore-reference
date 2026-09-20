@@ -1,14 +1,71 @@
+/* ==========================================================================
+   Theme Definitions (kmcd.dev Monochrome Black & White)
+   ========================================================================== */
+
+/* Dark Mode (Default) */
+:root,
+[data-theme="dark"] {
+  --bg-primary: #121214;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  --border-primary: #323238;
+  --border-secondary: #222226;
+  --text-contrast: #ffffff;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-disabled: #71717a;
+  --accent-primary: #f4f4f5;
+  --accent-primary-hover: #ffffff;
+  --accent-secondary: #d4d4d8;
+  --accent-tag: #d4d4d8;
+  --code-bg: #18181b;
+  --code-border: #27272a;
+  --dot-color: #52525b;
+  --badge-bg: rgba(255, 255, 255, 0.08);
+  --link-underline: rgba(255, 255, 255, 0.35);
+  --btn-primary-text: #121214;
+}
+
+/* Light Mode */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f5;
+  --bg-tertiary: #e4e4e7;
+  --border-primary: #d4d4d8;
+  --border-secondary: #e4e4e7;
+  --text-contrast: #09090b;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-disabled: #71717a;
+  --accent-primary: #18181b;
+  --accent-primary-hover: #09090b;
+  --accent-secondary: #3f3f46;
+  --accent-tag: #3f3f46;
+  --code-bg: #f6f8fa;
+  --code-border: #d0d7de;
+  --dot-color: #71717a;
+  --badge-bg: rgba(0, 0, 0, 0.06);
+  --link-underline: rgba(0, 0, 0, 0.25);
+  --btn-primary-text: #ffffff;
+}
+
+/* ==========================================================================
+   Global Resets & Design Tokens
+   ========================================================================== */
+
 :root {
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --danger: #dc2626;
-  --danger-hover: #b91c1c;
-  --bg: #0f172a;
-  --card-bg: #1e293b;
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --border: #334155;
-  --border-focus: #6366f1;
+  --bg: var(--bg-primary);
+  --card-bg: var(--bg-secondary);
+  --text: var(--text-primary);
+  --text-contrast-token: var(--text-contrast);
+  --text-muted: var(--text-secondary);
+  --border: var(--border-primary);
+  --border-focus: var(--accent-primary);
+  --primary: var(--accent-primary);
+  --primary-hover: var(--accent-primary-hover);
+  --primary-text: var(--btn-primary-text);
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
   --success: #10b981;
 }
 
@@ -24,12 +81,17 @@ body {
   color: var(--text);
   min-height: 100vh;
   padding: 2rem 1rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .container {
   max-width: 1024px;
   margin: 0 auto;
 }
+
+/* ==========================================================================
+   Header & Navbar
+   ========================================================================== */
 
 header.navbar {
   display: flex;
@@ -38,16 +100,25 @@ header.navbar {
   border-bottom: 1px solid var(--border);
   padding-bottom: 1.25rem;
   margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .brand-link {
   font-size: 1.35rem;
   font-weight: 700;
-  color: var(--text);
+  color: var(--text-contrast);
   text-decoration: none;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .nav-links {
@@ -66,8 +137,46 @@ header.navbar {
 
 .nav-links a:hover,
 .nav-links a.active {
-  color: #38bdf8;
+  color: var(--text-contrast);
 }
+
+/* ==========================================================================
+   Simple Theme Toggle Button
+   ========================================================================== */
+
+.theme-toggle-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  outline: none;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.theme-toggle-btn:hover {
+  color: var(--text-contrast);
+  background: var(--bg-tertiary);
+  border-color: var(--text-disabled);
+}
+
+.theme-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Breadcrumb & Cards
+   ========================================================================== */
 
 .breadcrumb {
   display: flex;
@@ -79,7 +188,7 @@ header.navbar {
 }
 
 .breadcrumb a {
-  color: #38bdf8;
+  color: var(--accent-secondary);
   text-decoration: none;
 }
 
@@ -88,7 +197,7 @@ header.navbar {
 }
 
 .breadcrumb-separator {
-  color: #475569;
+  color: var(--border-primary);
 }
 
 .card {
@@ -96,6 +205,7 @@ header.navbar {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1.5rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .card-header {
@@ -105,7 +215,7 @@ header.navbar {
 .card-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--text-contrast);
   margin-bottom: 0.35rem;
 }
 
@@ -113,6 +223,10 @@ header.navbar {
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+
+/* ==========================================================================
+   Forms & Controls
+   ========================================================================== */
 
 .form-group {
   margin-bottom: 1.25rem;
@@ -134,30 +248,39 @@ label {
 
 label.required::after {
   content: ' *';
-  color: #f87171;
+  color: var(--danger);
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   width: 100%;
   padding: 0.65rem 0.85rem;
-  background: #0f172a;
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  color: white;
+  color: var(--text);
   font-size: 0.95rem;
   font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   outline: 2px solid var(--border-focus);
   border-color: var(--border-focus);
 }
 
 .helper-text {
   font-size: 0.775rem;
-  color: #64748b;
+  color: var(--text-disabled);
   margin-top: 0.35rem;
 }
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
 
 .btn {
   display: inline-flex;
@@ -176,11 +299,12 @@ input:focus, select:focus, textarea:focus {
 
 .btn-primary {
   background: var(--primary);
-  color: white;
+  color: var(--primary-text);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
+  color: var(--primary-text);
 }
 
 .btn-primary:disabled {
@@ -189,26 +313,26 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-secondary {
-  background: #334155;
-  color: #e2e8f0;
-  border-color: #475569;
+  background: var(--bg-tertiary);
+  color: var(--text);
+  border-color: var(--border-primary);
 }
 
 .btn-secondary:hover {
-  background: #475569;
-  color: white;
+  background: var(--border-primary);
+  color: var(--text-contrast);
 }
 
 .btn-danger {
-  background: #0f172a;
-  color: #f87171;
+  background: var(--bg-primary);
+  color: var(--danger);
   border-color: rgba(239, 68, 68, 0.3);
 }
 
 .btn-danger:hover {
-  background: #7f1d1d;
-  color: white;
-  border-color: #ef4444;
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
 }
 
 .btn-sm {
@@ -225,10 +349,14 @@ input:focus, select:focus, textarea:focus {
   border-top: 1px solid var(--border);
 }
 
+/* ==========================================================================
+   Validation Alert
+   ========================================================================== */
+
 .validation-alert {
-  background: #450a0a;
-  border: 1px solid #b91c1c;
-  color: #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: var(--danger);
   padding: 0.85rem 1rem;
   border-radius: 6px;
   margin-bottom: 1.25rem;
@@ -238,8 +366,12 @@ input:focus, select:focus, textarea:focus {
 .validation-alert strong {
   display: block;
   margin-bottom: 0.35rem;
-  color: #f87171;
+  color: var(--danger);
 }
+
+/* ==========================================================================
+   Status Badges
+   ========================================================================== */
 
 .status-badge {
   font-size: 0.72rem;
@@ -268,15 +400,18 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
-/* Badge & Filter Styles */
+/* ==========================================================================
+   Badge & Filter Tabs
+   ========================================================================== */
+
 .badge {
-  background: #334155;
-  color: #cbd5e1;
+  background: var(--badge-bg);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.15rem 0.55rem;
   border-radius: 9999px;
-  border: 1px solid #475569;
+  border: 1px solid var(--border-primary);
 }
 
 .filter-bar {
@@ -298,18 +433,21 @@ input:focus, select:focus, textarea:focus {
 }
 
 .filter-tab:hover {
-  background: rgba(51, 65, 85, 0.4);
+  background: var(--badge-bg);
   color: var(--text);
 }
 
 .filter-tab.active {
-  background: #334155;
-  color: #ffffff;
-  border-color: #475569;
+  background: var(--bg-tertiary);
+  color: var(--text-contrast);
+  border-color: var(--border-primary);
   font-weight: 600;
 }
 
-/* Pets List & Item Styles */
+/* ==========================================================================
+   Pets List & Items
+   ========================================================================== */
+
 .pets-list {
   display: flex;
   flex-direction: column;
@@ -317,19 +455,19 @@ input:focus, select:focus, textarea:focus {
 }
 
 .pet-item {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 1rem 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
 }
 
 .pet-item:hover {
-  border-color: #475569;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-color: var(--text-disabled);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .pet-header {
@@ -349,13 +487,14 @@ input:focus, select:focus, textarea:focus {
 .pet-name {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--text-contrast);
   letter-spacing: -0.01em;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 .pet-name:hover {
-  color: #38bdf8;
+  color: var(--accent-secondary);
 }
 
 .pet-actions {
@@ -380,27 +519,27 @@ input:focus, select:focus, textarea:focus {
 }
 
 .action-edit {
-  background: #0f172a;
-  color: #cbd5e1;
-  border-color: #334155;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-color: var(--border-primary);
 }
 
 .action-edit:hover {
-  background: #334155;
-  color: #ffffff;
-  border-color: #475569;
+  background: var(--bg-tertiary);
+  color: var(--text-contrast);
+  border-color: var(--text-disabled);
 }
 
 .action-delete {
-  background: #0f172a;
-  color: #f87171;
+  background: var(--bg-primary);
+  color: var(--danger);
   border-color: rgba(239, 68, 68, 0.25);
 }
 
 .action-delete:hover {
-  background: #7f1d1d;
+  background: var(--danger);
   color: #ffffff;
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .pet-details-row {
@@ -408,23 +547,23 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--text-secondary);
   flex-wrap: wrap;
 }
 
 .meta-dot {
-  color: #475569;
+  color: var(--dot-color);
   font-weight: bold;
 }
 
 .pet-footer {
   padding-top: 0.6rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-disabled);
 }
 
 .audit-line {
@@ -435,30 +574,30 @@ input:focus, select:focus, textarea:focus {
 }
 
 .audit-line span.label {
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .audit-line span.user {
-  color: #cbd5e1;
+  color: var(--text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .audit-line span.time {
-  color: #64748b;
+  color: var(--text-disabled);
 }
 
 .empty-state {
   text-align: center;
   padding: 3rem 1.5rem;
-  background: rgba(15, 23, 42, 0.4);
+  background: var(--bg-secondary);
   border: 1px dashed var(--border);
   border-radius: 8px;
 }
 
 .empty-state h3 {
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--text-contrast);
   margin-bottom: 0.35rem;
 }
 

@@ -1,0 +1,5 @@
+stubs:
+  - id: get-pet-not-found
+    target: pet.v1.PetService/GetPet
+    error_code: 5
+    error_message: "pet not found: no pet exists with the specified ID"

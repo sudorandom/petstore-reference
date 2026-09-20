@@ -37,8 +37,8 @@ lint:
 vulncheck:
     govulncheck ./...
 
-# Run all quality & security checks (lint, vulncheck, unit tests)
-check: lint vulncheck test
+# Run all quality & security checks (lint, vulncheck, unit tests, frontend mock tests)
+check: lint vulncheck test test-web
 
 # Run all tests (including integration tests)
 test-integration:
@@ -68,10 +68,22 @@ migrate-status:
 run:
     go run ./cmd/server
 
-# Run FauxRPC mock server with HTTPS and generated OpenAPI specification
+# Run FauxRPC mock server with HTTPS, protobuf descriptor image, OpenAPI specification, and normal stubs
 fauxrpc:
-    fauxrpc run --schema=gen/openapi/pet/v1/pet.openapi.yaml --addr=127.0.0.1:6660 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
+    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/normal --addr=127.0.0.1:6660 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
 
-# Run Vite React frontend dev server
+# Run FauxRPC mock server configured with failure stubs to test error handling
+fauxrpc-fail:
+    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/failures --addr=127.0.0.1:6660 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
+
+# Run Vite React frontend dev server against real Go backend
 web-dev:
     cd web && pnpm dev
+
+# Run Vite React frontend dev server against FauxRPC mock server
+web-mock:
+    cd web && pnpm dev:mock
+
+# Run frontend tests against FauxRPC mock server
+test-web:
+    cd web && pnpm test

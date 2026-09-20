@@ -140,3 +140,28 @@ just fauxrpc
 ```
 - **Mock Documentation:** `https://127.0.0.1:6660/fauxrpc/docs/`
 FauxRPC will be available over HTTPS at `https://127.0.0.1:6660` with built-in documentation at `/fauxrpc/docs/`.
+
+### 8. Testing the Frontend with FauxRPC
+You can test the frontend against FauxRPC both interactively in the browser and via automated tests:
+
+#### Interactive Development / Manual Testing
+1. In one terminal, start the FauxRPC mock server:
+   ```bash
+   just fauxrpc
+   ```
+2. In another terminal, start the web dev server configured for mock mode:
+   ```bash
+   just web-mock
+   ```
+   The frontend at `https://localhost:4321` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
+
+#### Automated Frontend Tests
+Run the Vitest test suite, which automatically spawns an ephemeral FauxRPC mock server and verifies frontend pages and components:
+```bash
+just test-web
+```
+Or from the `web` directory:
+```bash
+pnpm test
+```
+

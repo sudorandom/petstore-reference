@@ -14,12 +14,14 @@ import (
 	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	"github.com/rs/cors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/example/pets/gen/go/pet/v1/petv1connect"
 	"github.com/example/pets/internal/auth"
 	"github.com/example/pets/internal/config"
 	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
+	"github.com/example/pets/internal/telemetry"
 	"github.com/example/pets/internal/validator"
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
@@ -30,6 +32,21 @@ func main() {
 	defer cancel()
 
 	log.Printf("Starting Pet Microservice on port %s...", cfg.Port)
+
+	// Initialize OpenTelemetry
+	otelCfg := telemetry.LoadConfigFromEnv()
+	shutdownOTel, err := telemetry.Init(ctx, otelCfg)
+	if err != nil {
+		log.Printf("Warning: OpenTelemetry init failed: %v", err)
+	} else {
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+			if err := shutdownOTel(shutdownCtx); err != nil {
+				log.Printf("Error shutting down OpenTelemetry: %v", err)
+			}
+		}()
+	}
 
 	// Initialize Protovalidate
 	pv, err := protovalidate.New()
@@ -57,7 +74,11 @@ func main() {
 	}
 	petService := pet.NewService(queries)
 
-	// Interceptors: Validation & Authentication
+	// Interceptors: Tracing, Validation & Authentication
+	otelInterceptor, err := telemetry.NewConnectInterceptor()
+	if err != nil {
+		log.Fatalf("Failed to initialize OpenTelemetry Connect interceptor: %v", err)
+	}
 	valInterceptor := validator.NewInterceptor(pv)
 	authInterceptor := auth.NewInterceptor(auth.Config{
 		Enabled:      cfg.AuthEnabled,
@@ -76,7 +97,7 @@ func main() {
 	petPath, petHandler := petv1connect.NewPetServiceHandler(
 		petService,
 		connect.WithCodec(&protojsonxconnect.Codec{}),
-		connect.WithInterceptors(valInterceptor, authInterceptor),
+		connect.WithInterceptors(otelInterceptor, valInterceptor, authInterceptor),
 	)
 	mux.Handle(petPath, petHandler)
 	log.Printf("Registered Connect handler at %s", petPath)
@@ -115,6 +136,9 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok","database":"disconnected"}`))
 	})
 
+	// Serve uploaded pet photos directly to browsers (instrumented with OpenTelemetry)
+	mux.Handle("/photos/", otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos"))
+
 	var rootHandler http.Handler = mux
 
 	// Locally in DevMode, apply dev identity middleware to inject simulated upstream IAP/OAuth2-Proxy headers
@@ -142,6 +166,8 @@ func main() {
 			"Connect-Content-Encoding",
 			"Grpc-Status",
 			"Grpc-Message",
+			"traceparent",
+			"tracestate",
 		},
 		MaxAge: 300,
 	}).Handler(rootHandler)

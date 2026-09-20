@@ -23,10 +23,11 @@ func TestValidatorInterceptor(t *testing.T) {
 
 	t.Run("valid CreatePetRequest", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.CreatePetRequest{
-			Name:    "Buddy",
-			Species: "Dog",
-			Age:     3,
-			Status:  petv1.PetStatus_PET_STATUS_AVAILABLE,
+			Name:               "Buddy",
+			Species:            "Dog",
+			BirthDate:          "2023-01-15",
+			BirthDateEstimated: true,
+			Status:             petv1.PetStatus_PET_STATUS_AVAILABLE,
 		})
 		_, err := interceptor(dummyNext)(context.Background(), req)
 		if err != nil {
@@ -36,10 +37,26 @@ func TestValidatorInterceptor(t *testing.T) {
 
 	t.Run("invalid CreatePetRequest - missing name", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.CreatePetRequest{
-			Name:    "",
-			Species: "Dog",
-			Age:     3,
-			Status:  petv1.PetStatus_PET_STATUS_AVAILABLE,
+			Name:      "",
+			Species:   "Dog",
+			BirthDate: "2023-01-15",
+			Status:    petv1.PetStatus_PET_STATUS_AVAILABLE,
+		})
+		_, err := interceptor(dummyNext)(context.Background(), req)
+		if err == nil {
+			t.Fatal("expected validation error, got nil")
+		}
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("expected CodeInvalidArgument, got %v", connect.CodeOf(err))
+		}
+	})
+
+	t.Run("invalid CreatePetRequest - invalid birth_date format", func(t *testing.T) {
+		req := connect.NewRequest(&petv1.CreatePetRequest{
+			Name:      "Buddy",
+			Species:   "Dog",
+			BirthDate: "invalid-date",
+			Status:    petv1.PetStatus_PET_STATUS_AVAILABLE,
 		})
 		_, err := interceptor(dummyNext)(context.Background(), req)
 		if err == nil {

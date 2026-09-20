@@ -1,0 +1,20 @@
+stubs:
+  - id: upload-pet-photo
+    target: pet.v1.PetService/UploadPetPhoto
+    cel_content: |
+      {
+        'photo_id': 'f1e2d3c4-b5a6-4f7e-8d9c-0b1a2c3d4e5f',
+        'photo_url': 'https://picsum.photos/seed/' + string(req.pet_id) + '/400/400',
+        'pet': {
+          'id': req.pet_id,
+          'name': fake_pet_name(),
+          'species': 'Dog',
+          'birth_date': '2023-01-01',
+          'birth_date_estimated': false,
+          'status': 'PET_STATUS_AVAILABLE',
+          'photo_urls': ['https://picsum.photos/seed/' + string(req.pet_id) + '/400/400'],
+          'tags': ['photo-updated'],
+          'created_by': 'system',
+          'modified_by': 'system'
+        }
+      }

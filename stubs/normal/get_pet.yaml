@@ -1,0 +1,23 @@
+stubs:
+  - id: get-pet
+    target: pet.v1.PetService/GetPet
+    cel_content: |
+      {
+        'pet': {
+          'id': req.id,
+          'name': fake_pet_name(),
+          'species': ['Dog', 'Cat', 'Bird', 'Rabbit', 'Hamster'][fake_int() % 5],
+          'birth_date': '2023-05-10',
+          'birth_date_estimated': (fake_int() % 2 == 0),
+          'status': ['PET_STATUS_AVAILABLE', 'PET_STATUS_PENDING', 'PET_STATUS_ADOPTED'][fake_int() % 3],
+          'photo_urls': [
+            'https://picsum.photos/seed/' + string(req.id) + '/400/400'
+          ],
+          'tags': [
+            fake_adjective(),
+            fake_adjective()
+          ],
+          'created_by': 'system',
+          'modified_by': 'system'
+        }
+      }

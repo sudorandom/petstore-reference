@@ -1,0 +1,5 @@
+stubs:
+  - id: update-pet-failed-precondition
+    target: pet.v1.PetService/UpdatePet
+    error_code: 9
+    error_message: "failed precondition: cannot update an adopted pet without manager approval"

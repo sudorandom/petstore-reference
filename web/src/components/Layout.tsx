@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { ThemeSwitcher } from './ThemeSwitcher';
 
 interface BreadcrumbItem {
   label: string;
@@ -18,20 +19,23 @@ export const Layout: React.FC<LayoutProps> = ({ breadcrumbs, children }) => {
         <Link to="/" className="brand-link">
           🐾 Petstore
         </Link>
-        <nav className="nav-links">
-          <NavLink to="/" end>
-            Directory
-          </NavLink>
-          <NavLink to="/docs">
-            API Docs
-          </NavLink>
-          <a href="/openapi.yaml" target="_blank" rel="noopener noreferrer">
-            OpenAPI Spec
-          </a>
-          <a href="https://localhost:8080/healthz" target="_blank" rel="noopener noreferrer">
-            Health
-          </a>
-        </nav>
+        <div className="navbar-right">
+          <nav className="nav-links">
+            <NavLink to="/" end>
+              Directory
+            </NavLink>
+            <NavLink to="/docs">
+              API Docs
+            </NavLink>
+            <a href="/openapi.yaml" target="_blank" rel="noopener noreferrer">
+              OpenAPI Spec
+            </a>
+            <a href="https://localhost:8080/healthz" target="_blank" rel="noopener noreferrer">
+              Health
+            </a>
+          </nav>
+          <ThemeSwitcher />
+        </div>
       </header>
 
       {breadcrumbs && breadcrumbs.length > 0 && (

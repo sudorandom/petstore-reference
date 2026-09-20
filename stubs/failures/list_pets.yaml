@@ -1,0 +1,5 @@
+stubs:
+  - id: list-pets-unavailable
+    target: pet.v1.PetService/ListPets
+    error_code: 14
+    error_message: "service unavailable: database connection refused"

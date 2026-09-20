@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/example/pets/internal/auth"
 	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
+	"github.com/example/pets/internal/telemetry"
 	"github.com/example/pets/internal/validator"
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
@@ -88,6 +90,11 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 	queries := db.New(pool)
 	service := pet.NewService(queries)
 
+	otelInterceptor, err := telemetry.NewConnectInterceptor()
+	if err != nil {
+		t.Fatalf("failed to create otel interceptor: %v", err)
+	}
+
 	valInterceptor := validator.NewInterceptor(pv)
 	authInterceptor := auth.NewInterceptor(auth.Config{
 		Enabled:      true,
@@ -97,11 +104,12 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 	path, handler := petv1connect.NewPetServiceHandler(
 		service,
 		connect.WithCodec(&protojsonxconnect.Codec{}),
-		connect.WithInterceptors(valInterceptor, authInterceptor),
+		connect.WithInterceptors(otelInterceptor, valInterceptor, authInterceptor),
 	)
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
+	mux.Handle("/photos/", pet.NewPhotoHandler(queries))
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
@@ -116,12 +124,13 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 
 	t.Run("CreatePet", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.CreatePetRequest{
-			Name:      "Milo",
-			Species:   "Dog",
-			Age:       2,
-			Status:    petv1.PetStatus_PET_STATUS_AVAILABLE,
-			PhotoUrls: []string{"https://example.com/milo.jpg"},
-			Tags:      []string{"friendly", "playful"},
+			Name:               "Milo",
+			Species:            "Dog",
+			BirthDate:          "2023-05-10",
+			BirthDateEstimated: false,
+			Status:             petv1.PetStatus_PET_STATUS_AVAILABLE,
+			PhotoUrls:          []string{"https://example.com/milo.jpg"},
+			Tags:               []string{"friendly", "playful"},
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
@@ -132,6 +141,12 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 
 		if resp.Msg.Pet.Name != "Milo" {
 			t.Errorf("expected pet name Milo, got %s", resp.Msg.Pet.Name)
+		}
+		if resp.Msg.Pet.BirthDate != "2023-05-10" {
+			t.Errorf("expected birth date 2023-05-10, got %s", resp.Msg.Pet.BirthDate)
+		}
+		if resp.Msg.Pet.BirthDateEstimated {
+			t.Errorf("expected birth_date_estimated to be false")
 		}
 		if resp.Msg.Pet.Id == "" {
 			t.Fatal("expected non-empty pet ID")
@@ -184,13 +199,14 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 		}
 
 		req := connect.NewRequest(&petv1.UpdatePetRequest{
-			Id:        createdPetID,
-			Name:      "Milo The Great",
-			Species:   "Dog",
-			Age:       3,
-			Status:    petv1.PetStatus_PET_STATUS_ADOPTED,
-			PhotoUrls: []string{"https://example.com/milo2.jpg"},
-			Tags:      []string{"adopted", "happy"},
+			Id:                 createdPetID,
+			Name:               "Milo The Great",
+			Species:            "Dog",
+			BirthDate:          "2022-04-12",
+			BirthDateEstimated: true,
+			Status:             petv1.PetStatus_PET_STATUS_ADOPTED,
+			PhotoUrls:          []string{"https://example.com/milo2.jpg"},
+			Tags:               []string{"adopted", "happy"},
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
@@ -201,8 +217,113 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 		if resp.Msg.Pet.Name != "Milo The Great" {
 			t.Errorf("expected updated name, got %s", resp.Msg.Pet.Name)
 		}
+		if resp.Msg.Pet.BirthDate != "2022-04-12" {
+			t.Errorf("expected birth date 2022-04-12, got %s", resp.Msg.Pet.BirthDate)
+		}
+		if !resp.Msg.Pet.BirthDateEstimated {
+			t.Errorf("expected birth_date_estimated to be true")
+		}
 		if resp.Msg.Pet.Status != petv1.PetStatus_PET_STATUS_ADOPTED {
 			t.Errorf("expected status ADOPTED, got %v", resp.Msg.Pet.Status)
+		}
+	})
+
+	var uploadedPhotoID string
+	var uploadedPhotoURL string
+
+	t.Run("UploadPetPhoto", func(t *testing.T) {
+		if createdPetID == "" {
+			t.Skip("skipping UploadPetPhoto")
+		}
+
+		dummyPhoto := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG header bytes
+
+		req := connect.NewRequest(&petv1.UploadPetPhotoRequest{
+			PetId:    createdPetID,
+			Data:     dummyPhoto,
+			MimeType: "image/jpeg",
+		})
+		req.Header().Set("Authorization", "Bearer test-token")
+
+		resp, err := client.UploadPetPhoto(ctx, req)
+		if err != nil {
+			t.Fatalf("UploadPetPhoto failed: %v", err)
+		}
+
+		if resp.Msg.PhotoId == "" {
+			t.Fatal("expected non-empty photo ID")
+		}
+		uploadedPhotoID = resp.Msg.PhotoId
+		uploadedPhotoURL = resp.Msg.PhotoUrl
+
+		expectedPrefix := "/photos/" + uploadedPhotoID
+		if resp.Msg.PhotoUrl != expectedPrefix {
+			t.Errorf("expected photo URL %s, got %s", expectedPrefix, resp.Msg.PhotoUrl)
+		}
+
+		// Verify pet returned has the new photo URL
+		found := false
+		for _, u := range resp.Msg.Pet.PhotoUrls {
+			if u == uploadedPhotoURL {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected pet.PhotoUrls to contain %s, got %v", uploadedPhotoURL, resp.Msg.Pet.PhotoUrls)
+		}
+	})
+
+	t.Run("GetPetPhoto", func(t *testing.T) {
+		if uploadedPhotoID == "" {
+			t.Skip("skipping GetPetPhoto")
+		}
+
+		req := connect.NewRequest(&petv1.GetPetPhotoRequest{PhotoId: uploadedPhotoID})
+		req.Header().Set("Authorization", "Bearer test-token")
+
+		resp, err := client.GetPetPhoto(ctx, req)
+		if err != nil {
+			t.Fatalf("GetPetPhoto failed: %v", err)
+		}
+
+		if resp.Msg.PhotoId != uploadedPhotoID {
+			t.Errorf("expected photo ID %s, got %s", uploadedPhotoID, resp.Msg.PhotoId)
+		}
+		if resp.Msg.PetId != createdPetID {
+			t.Errorf("expected pet ID %s, got %s", createdPetID, resp.Msg.PetId)
+		}
+		if resp.Msg.MimeType != "image/jpeg" {
+			t.Errorf("expected mime type image/jpeg, got %s", resp.Msg.MimeType)
+		}
+		if len(resp.Msg.Data) != 10 {
+			t.Errorf("expected 10 bytes of data, got %d", len(resp.Msg.Data))
+		}
+	})
+
+	t.Run("ServePetPhotoHTTP", func(t *testing.T) {
+		if uploadedPhotoURL == "" {
+			t.Skip("skipping ServePetPhotoHTTP")
+		}
+
+		httpResp, err := server.Client().Get(server.URL + uploadedPhotoURL)
+		if err != nil {
+			t.Fatalf("HTTP GET photo failed: %v", err)
+		}
+		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			t.Errorf("expected HTTP 200, got %d", httpResp.StatusCode)
+		}
+		if ct := httpResp.Header.Get("Content-Type"); ct != "image/jpeg" {
+			t.Errorf("expected Content-Type image/jpeg, got %s", ct)
+		}
+		body, err := io.ReadAll(httpResp.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		if len(body) != 10 {
+			t.Errorf("expected 10 bytes, got %d", len(body))
 		}
 	})
 

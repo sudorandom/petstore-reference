@@ -1,0 +1,7 @@
+stubs:
+  - id: delete-pet
+    target: pet.v1.PetService/DeletePet
+    cel_content: |
+      {
+        'success': true
+      }

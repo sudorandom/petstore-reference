@@ -30,11 +30,13 @@ export const EditPet: React.FC = () => {
 
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('');
-  const [age, setAge] = useState(1);
+  const [birthDate, setBirthDate] = useState('');
+  const [birthDateEstimated, setBirthDateEstimated] = useState(false);
   const [status, setStatus] = useState<PetStatus>(PetStatus.AVAILABLE);
   const [tags, setTags] = useState('');
   const [photos, setPhotos] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const pet = data?.pet;
 
@@ -42,7 +44,8 @@ export const EditPet: React.FC = () => {
     if (pet) {
       setName(pet.name);
       setSpecies(pet.species);
-      setAge(pet.age);
+      setBirthDate(pet.birthDate);
+      setBirthDateEstimated(pet.birthDateEstimated);
       setStatus(pet.status);
       setTags((pet.tags || []).join(', '));
       setPhotos((pet.photoUrls || []).join(', '));
@@ -61,6 +64,55 @@ export const EditPet: React.FC = () => {
     },
   });
 
+  const uploadPhotoMutation = useMutation(PetService.method.uploadPetPhoto, {
+    onSuccess: (res) => {
+      setPhotos((prev) => (prev ? `${prev}, ${res.photoUrl}` : res.photoUrl));
+      queryClient.invalidateQueries();
+    },
+    onError: (err) => {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setValidationError(msg);
+    },
+  });
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pet) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setValidationError('Photo must be less than 5MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setValidationError('Photo must be a JPEG, PNG, WebP, or GIF image.');
+      e.target.value = '';
+      return;
+    }
+
+    setValidationError(null);
+    setIsUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const res = await uploadPhotoMutation.mutateAsync({
+        petId: pet.id,
+        data: new Uint8Array(buffer),
+        mimeType: file.type,
+      });
+      setPhotos((prev) => (prev ? `${prev}, ${res.photoUrl}` : res.photoUrl));
+    } catch (err: any) {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setValidationError(msg);
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
@@ -78,7 +130,8 @@ export const EditPet: React.FC = () => {
       id: id || '',
       name: name.trim(),
       species: species.trim(),
-      age,
+      birthDate,
+      birthDateEstimated,
       status,
       tags: tagList,
       photoUrls: photoList,
@@ -107,7 +160,7 @@ export const EditPet: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          <h2 style={{ color: '#f87171', fontSize: '1.15rem', marginBottom: '0.5rem' }}>
+          <h2 style={{ color: 'var(--danger)', fontSize: '1.15rem', marginBottom: '0.5rem' }}>
             Pet Not Found
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
@@ -177,16 +230,29 @@ export const EditPet: React.FC = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="pet-age">Age</label>
+              <label htmlFor="pet-birth-date" className="required">
+                Birth Date
+              </label>
               <input
-                type="number"
-                id="pet-age"
-                min="0"
-                max="100"
-                value={age}
-                onChange={(e) => setAge(parseInt(e.target.value, 10) || 0)}
+                type="date"
+                id="pet-birth-date"
+                value={birthDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setBirthDate(e.target.value)}
+                required
               />
-              <div className="helper-text">Age in years (0 - 100)</div>
+              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input
+                  type="checkbox"
+                  id="pet-birth-date-estimated"
+                  checked={birthDateEstimated}
+                  onChange={(e) => setBirthDateEstimated(e.target.checked)}
+                  style={{ width: 'auto', cursor: 'pointer' }}
+                />
+                <label htmlFor="pet-birth-date-estimated" style={{ margin: 0, fontSize: '0.8rem', fontWeight: 'normal', cursor: 'pointer' }}>
+                  This birth date is an estimate
+                </label>
+              </div>
             </div>
 
             <div className="form-group">
@@ -225,25 +291,43 @@ export const EditPet: React.FC = () => {
               placeholder="e.g. https://example.com/pet1.jpg, https://example.com/pet2.jpg"
             />
             <div className="helper-text">Separate image URLs with commas</div>
+
+            <div style={{ marginTop: '0.75rem' }}>
+              <label htmlFor="pet-upload-photo" style={{ fontSize: '0.85rem' }}>
+                Upload Photo to Database
+              </label>
+              <input
+                type="file"
+                id="pet-upload-photo"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handlePhotoUpload}
+                disabled={isUploading}
+              />
+              <div className="helper-text">
+                {isUploading
+                  ? 'Uploading photo...'
+                  : 'JPEG, PNG, WebP, or GIF up to 5MB (stored in PostgreSQL)'}
+              </div>
+            </div>
           </div>
 
           <div
             style={{
-              background: '#0f172a',
+              background: 'var(--badge-bg)',
               border: '1px solid var(--border)',
               borderRadius: '6px',
               padding: '0.85rem 1rem',
               marginBottom: '1.25rem',
               fontSize: '0.8rem',
-              color: '#64748b',
+              color: 'var(--text-disabled)',
             }}
           >
-            <div style={{ fontWeight: 500, color: '#94a3b8', marginBottom: '0.35rem' }}>
+            <div style={{ fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
               Audit Information
             </div>
             <div>
               Created by{' '}
-              <span style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
+              <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                 {pet.createdBy || 'unknown'}
               </span>{' '}
               on {formatDate(pet.createdAt)}
@@ -251,7 +335,7 @@ export const EditPet: React.FC = () => {
                 <>
                   <br />
                   Last modified by{' '}
-                  <span style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
+                  <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                     {pet.modifiedBy}
                   </span>{' '}
                   on {formatDate(pet.modifiedAt)}

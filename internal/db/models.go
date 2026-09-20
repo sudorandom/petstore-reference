@@ -9,15 +9,25 @@ import (
 )
 
 type Pet struct {
-	ID         pgtype.UUID        `json:"id"`
-	Name       string             `json:"name"`
-	Species    string             `json:"species"`
-	Age        int32              `json:"age"`
-	Status     string             `json:"status"`
-	PhotoUrls  []string           `json:"photo_urls"`
-	Tags       []string           `json:"tags"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	ModifiedAt pgtype.Timestamptz `json:"modified_at"`
-	CreatedBy  string             `json:"created_by"`
-	ModifiedBy string             `json:"modified_by"`
+	ID                 pgtype.UUID        `json:"id"`
+	Name               string             `json:"name"`
+	Species            string             `json:"species"`
+	BirthDate          pgtype.Date        `json:"birth_date"`
+	BirthDateEstimated bool               `json:"birth_date_estimated"`
+	Status             string             `json:"status"`
+	PhotoUrls          []string           `json:"photo_urls"`
+	Tags               []string           `json:"tags"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	ModifiedAt         pgtype.Timestamptz `json:"modified_at"`
+	CreatedBy          string             `json:"created_by"`
+	ModifiedBy         string             `json:"modified_by"`
+}
+
+type PetPhoto struct {
+	ID        pgtype.UUID        `json:"id"`
+	PetID     pgtype.UUID        `json:"pet_id"`
+	Data      []byte             `json:"data"`
+	MimeType  string             `json:"mime_type"`
+	SizeBytes int32              `json:"size_bytes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

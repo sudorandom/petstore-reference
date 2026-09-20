@@ -43,6 +43,11 @@ const (
 	PetServiceUpdatePetProcedure = "/pet.v1.PetService/UpdatePet"
 	// PetServiceDeletePetProcedure is the fully-qualified name of the PetService's DeletePet RPC.
 	PetServiceDeletePetProcedure = "/pet.v1.PetService/DeletePet"
+	// PetServiceUploadPetPhotoProcedure is the fully-qualified name of the PetService's UploadPetPhoto
+	// RPC.
+	PetServiceUploadPetPhotoProcedure = "/pet.v1.PetService/UploadPetPhoto"
+	// PetServiceGetPetPhotoProcedure is the fully-qualified name of the PetService's GetPetPhoto RPC.
+	PetServiceGetPetPhotoProcedure = "/pet.v1.PetService/GetPetPhoto"
 )
 
 // PetServiceClient is a client for the pet.v1.PetService service.
@@ -52,6 +57,8 @@ type PetServiceClient interface {
 	ListPets(context.Context, *connect.Request[v1.ListPetsRequest]) (*connect.Response[v1.ListPetsResponse], error)
 	UpdatePet(context.Context, *connect.Request[v1.UpdatePetRequest]) (*connect.Response[v1.UpdatePetResponse], error)
 	DeletePet(context.Context, *connect.Request[v1.DeletePetRequest]) (*connect.Response[v1.DeletePetResponse], error)
+	UploadPetPhoto(context.Context, *connect.Request[v1.UploadPetPhotoRequest]) (*connect.Response[v1.UploadPetPhotoResponse], error)
+	GetPetPhoto(context.Context, *connect.Request[v1.GetPetPhotoRequest]) (*connect.Response[v1.GetPetPhotoResponse], error)
 }
 
 // NewPetServiceClient constructs a client for the pet.v1.PetService service. By default, it uses
@@ -95,16 +102,30 @@ func NewPetServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(petServiceMethods.ByName("DeletePet")),
 			connect.WithClientOptions(opts...),
 		),
+		uploadPetPhoto: connect.NewClient[v1.UploadPetPhotoRequest, v1.UploadPetPhotoResponse](
+			httpClient,
+			baseURL+PetServiceUploadPetPhotoProcedure,
+			connect.WithSchema(petServiceMethods.ByName("UploadPetPhoto")),
+			connect.WithClientOptions(opts...),
+		),
+		getPetPhoto: connect.NewClient[v1.GetPetPhotoRequest, v1.GetPetPhotoResponse](
+			httpClient,
+			baseURL+PetServiceGetPetPhotoProcedure,
+			connect.WithSchema(petServiceMethods.ByName("GetPetPhoto")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // petServiceClient implements PetServiceClient.
 type petServiceClient struct {
-	createPet *connect.Client[v1.CreatePetRequest, v1.CreatePetResponse]
-	getPet    *connect.Client[v1.GetPetRequest, v1.GetPetResponse]
-	listPets  *connect.Client[v1.ListPetsRequest, v1.ListPetsResponse]
-	updatePet *connect.Client[v1.UpdatePetRequest, v1.UpdatePetResponse]
-	deletePet *connect.Client[v1.DeletePetRequest, v1.DeletePetResponse]
+	createPet      *connect.Client[v1.CreatePetRequest, v1.CreatePetResponse]
+	getPet         *connect.Client[v1.GetPetRequest, v1.GetPetResponse]
+	listPets       *connect.Client[v1.ListPetsRequest, v1.ListPetsResponse]
+	updatePet      *connect.Client[v1.UpdatePetRequest, v1.UpdatePetResponse]
+	deletePet      *connect.Client[v1.DeletePetRequest, v1.DeletePetResponse]
+	uploadPetPhoto *connect.Client[v1.UploadPetPhotoRequest, v1.UploadPetPhotoResponse]
+	getPetPhoto    *connect.Client[v1.GetPetPhotoRequest, v1.GetPetPhotoResponse]
 }
 
 // CreatePet calls pet.v1.PetService.CreatePet.
@@ -132,6 +153,16 @@ func (c *petServiceClient) DeletePet(ctx context.Context, req *connect.Request[v
 	return c.deletePet.CallUnary(ctx, req)
 }
 
+// UploadPetPhoto calls pet.v1.PetService.UploadPetPhoto.
+func (c *petServiceClient) UploadPetPhoto(ctx context.Context, req *connect.Request[v1.UploadPetPhotoRequest]) (*connect.Response[v1.UploadPetPhotoResponse], error) {
+	return c.uploadPetPhoto.CallUnary(ctx, req)
+}
+
+// GetPetPhoto calls pet.v1.PetService.GetPetPhoto.
+func (c *petServiceClient) GetPetPhoto(ctx context.Context, req *connect.Request[v1.GetPetPhotoRequest]) (*connect.Response[v1.GetPetPhotoResponse], error) {
+	return c.getPetPhoto.CallUnary(ctx, req)
+}
+
 // PetServiceHandler is an implementation of the pet.v1.PetService service.
 type PetServiceHandler interface {
 	CreatePet(context.Context, *connect.Request[v1.CreatePetRequest]) (*connect.Response[v1.CreatePetResponse], error)
@@ -139,6 +170,8 @@ type PetServiceHandler interface {
 	ListPets(context.Context, *connect.Request[v1.ListPetsRequest]) (*connect.Response[v1.ListPetsResponse], error)
 	UpdatePet(context.Context, *connect.Request[v1.UpdatePetRequest]) (*connect.Response[v1.UpdatePetResponse], error)
 	DeletePet(context.Context, *connect.Request[v1.DeletePetRequest]) (*connect.Response[v1.DeletePetResponse], error)
+	UploadPetPhoto(context.Context, *connect.Request[v1.UploadPetPhotoRequest]) (*connect.Response[v1.UploadPetPhotoResponse], error)
+	GetPetPhoto(context.Context, *connect.Request[v1.GetPetPhotoRequest]) (*connect.Response[v1.GetPetPhotoResponse], error)
 }
 
 // NewPetServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -178,6 +211,18 @@ func NewPetServiceHandler(svc PetServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(petServiceMethods.ByName("DeletePet")),
 		connect.WithHandlerOptions(opts...),
 	)
+	petServiceUploadPetPhotoHandler := connect.NewUnaryHandler(
+		PetServiceUploadPetPhotoProcedure,
+		svc.UploadPetPhoto,
+		connect.WithSchema(petServiceMethods.ByName("UploadPetPhoto")),
+		connect.WithHandlerOptions(opts...),
+	)
+	petServiceGetPetPhotoHandler := connect.NewUnaryHandler(
+		PetServiceGetPetPhotoProcedure,
+		svc.GetPetPhoto,
+		connect.WithSchema(petServiceMethods.ByName("GetPetPhoto")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.v1.PetService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PetServiceCreatePetProcedure:
@@ -190,6 +235,10 @@ func NewPetServiceHandler(svc PetServiceHandler, opts ...connect.HandlerOption) 
 			petServiceUpdatePetHandler.ServeHTTP(w, r)
 		case PetServiceDeletePetProcedure:
 			petServiceDeletePetHandler.ServeHTTP(w, r)
+		case PetServiceUploadPetPhotoProcedure:
+			petServiceUploadPetPhotoHandler.ServeHTTP(w, r)
+		case PetServiceGetPetPhotoProcedure:
+			petServiceGetPetPhotoHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -217,4 +266,12 @@ func (UnimplementedPetServiceHandler) UpdatePet(context.Context, *connect.Reques
 
 func (UnimplementedPetServiceHandler) DeletePet(context.Context, *connect.Request[v1.DeletePetRequest]) (*connect.Response[v1.DeletePetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.v1.PetService.DeletePet is not implemented"))
+}
+
+func (UnimplementedPetServiceHandler) UploadPetPhoto(context.Context, *connect.Request[v1.UploadPetPhotoRequest]) (*connect.Response[v1.UploadPetPhotoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.v1.PetService.UploadPetPhoto is not implemented"))
+}
+
+func (UnimplementedPetServiceHandler) GetPetPhoto(context.Context, *connect.Request[v1.GetPetPhotoRequest]) (*connect.Response[v1.GetPetPhotoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.v1.PetService.GetPetPhoto is not implemented"))
 }

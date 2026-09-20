@@ -11,31 +11,49 @@ export const CreatePet: React.FC = () => {
 
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('');
-  const [age, setAge] = useState(1);
+  const [birthDate, setBirthDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [birthDateEstimated, setBirthDateEstimated] = useState(false);
   const [status, setStatus] = useState<PetStatus>(PetStatus.AVAILABLE);
   const [tags, setTags] = useState('');
   const [photos, setPhotos] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const createMutation = useMutation(PetService.method.createPet, {
-    onSuccess: (res) => {
-      queryClient.invalidateQueries();
-      if (res.pet?.id) {
-        navigate(`/pets/${res.pet.id}`);
-      } else {
-        navigate('/');
-      }
-    },
-    onError: (err) => {
-      let msg = err.rawMessage || err.message || String(err);
-      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
-      setValidationError(msg);
-    },
-  });
+  const createMutation = useMutation(PetService.method.createPet);
+  const uploadPhotoMutation = useMutation(PetService.method.uploadPetPhoto);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setValidationError('Photo must be less than 5MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setValidationError('Photo must be a JPEG, PNG, WebP, or GIF image.');
+      e.target.value = '';
+      return;
+    }
+
+    setValidationError(null);
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
+    setIsSubmitting(true);
 
     const tagList = tags
       .split(',')
@@ -46,14 +64,39 @@ export const CreatePet: React.FC = () => {
       .map((u) => u.trim())
       .filter(Boolean);
 
-    createMutation.mutate({
-      name: name.trim(),
-      species: species.trim(),
-      age,
-      status,
-      tags: tagList,
-      photoUrls: photoList,
-    });
+    try {
+      const res = await createMutation.mutateAsync({
+        name: name.trim(),
+        species: species.trim(),
+        birthDate,
+        birthDateEstimated,
+        status,
+        tags: tagList,
+        photoUrls: photoList,
+      });
+
+      if (res.pet?.id && photoFile) {
+        const buffer = await photoFile.arrayBuffer();
+        await uploadPhotoMutation.mutateAsync({
+          petId: res.pet.id,
+          data: new Uint8Array(buffer),
+          mimeType: photoFile.type,
+        });
+      }
+
+      queryClient.invalidateQueries();
+      if (res.pet?.id) {
+        navigate(`/pets/${res.pet.id}`);
+      } else {
+        navigate('/');
+      }
+    } catch (err: any) {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setValidationError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -66,7 +109,9 @@ export const CreatePet: React.FC = () => {
       <div className="card" style={{ maxWidth: '680px', margin: '0 auto' }}>
         <div className="card-header">
           <h1 className="card-title">Add New Pet</h1>
-          <p className="card-subtitle">Register a new pet in the microservice directory.</p>
+          <p className="card-subtitle">
+            Register a new pet in the microservice directory.
+          </p>
         </div>
 
         {validationError && (
@@ -111,16 +156,29 @@ export const CreatePet: React.FC = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="pet-age">Age</label>
+              <label htmlFor="pet-birth-date" className="required">
+                Birth Date
+              </label>
               <input
-                type="number"
-                id="pet-age"
-                min="0"
-                max="100"
-                value={age}
-                onChange={(e) => setAge(parseInt(e.target.value, 10) || 0)}
+                type="date"
+                id="pet-birth-date"
+                value={birthDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setBirthDate(e.target.value)}
+                required
               />
-              <div className="helper-text">Age in years (0 - 100)</div>
+              <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input
+                  type="checkbox"
+                  id="pet-birth-date-estimated"
+                  checked={birthDateEstimated}
+                  onChange={(e) => setBirthDateEstimated(e.target.checked)}
+                  style={{ width: 'auto', cursor: 'pointer' }}
+                />
+                <label htmlFor="pet-birth-date-estimated" style={{ margin: 0, fontSize: '0.8rem', fontWeight: 'normal', cursor: 'pointer' }}>
+                  This birth date is an estimate
+                </label>
+              </div>
             </div>
 
             <div className="form-group">
@@ -150,7 +208,46 @@ export const CreatePet: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="pet-photos">Photo URLs</label>
+            <label htmlFor="pet-upload-photo">Upload Photo</label>
+            <input
+              type="file"
+              id="pet-upload-photo"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleFileChange}
+            />
+            <div className="helper-text">JPEG, PNG, WebP, or GIF up to 5MB (stored in PostgreSQL)</div>
+
+            {photoPreview && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  style={{
+                    maxHeight: '160px',
+                    maxWidth: '100%',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    objectFit: 'cover',
+                  }}
+                />
+                <div style={{ marginTop: '0.35rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setPhotoFile(null);
+                      setPhotoPreview(null);
+                    }}
+                  >
+                    Remove Photo
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="pet-photos">Additional Photo URLs</label>
             <input
               type="text"
               id="pet-photos"
@@ -165,9 +262,9 @@ export const CreatePet: React.FC = () => {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createMutation.isPending}
+              disabled={isSubmitting}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Pet'}
+              {isSubmitting ? 'Creating & Uploading...' : 'Create Pet'}
             </button>
             <Link to="/" className="btn btn-secondary">
               Cancel
