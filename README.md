@@ -1,6 +1,8 @@
 # Petstore Reference Architecture (`petstore-reference`)
 
-A modern, production-grade reference microservice modeled after the classic Petstore domain, built with **Go 1.27**, **ConnectRPC**, **OpenTelemetry**, **Buf**, **protovalidate**, **FauxRPC**, **sqlc**, **PostgreSQL**, and a **React + Vite** frontend using **TanStack Query** and **Connect-Web**.
+A modern, production-grade reference microservice modeled after the classic Petstore domain, built with **[Go 1.27](https://go.dev)**, **[ConnectRPC](https://connectrpc.com)**, **[OpenTelemetry](https://opentelemetry.io)**, **[Buf](https://buf.build)**, **[protovalidate](https://github.com/bufbuild/protovalidate)**, **[FauxRPC](https://github.com/sudorandom/fauxrpc)**, **[sqlc](https://sqlc.dev)**, **[PostgreSQL](https://www.postgresql.org)**, and a **[React](https://react.dev)** + **[Vite](https://vite.dev)** frontend using **[TanStack Query](https://tanstack.com/query)** and **[Connect-Web](https://connectrpc.com/docs/web/getting-started)**.
+
+This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues/11). This shows how you can have static typing and validation for your APIs, your code (because Go) and database queries via SQLc.
 
 ---
 
@@ -43,8 +45,7 @@ A modern, production-grade reference microservice modeled after the classic Pets
 │   ├── config/             # Environment variable configuration
 │   ├── db/                 # SQLC generated database code & pgxpool with otelpgx
 │   ├── pet/                # PetServiceHandler implementation & photo streaming handler
-│   ├── telemetry/          # OpenTelemetry TracerProvider & Connect interceptor setup
-│   └── validator/          # protovalidate unary interceptor
+│   └── telemetry/          # OpenTelemetry TracerProvider & Connect interceptor setup
 ├── proto/
 │   └── pet/v1/pet.proto    # Protobuf schema with validation rules
 ├── gen/                    # Generated Go stubs, OpenAPI specs, and binary descriptor images

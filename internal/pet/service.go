@@ -328,11 +328,10 @@ func toProtoPet(p db.Pet) *petv1.Pet {
 // NewPhotoHandler returns an http.Handler that serves pet photos by ID at /photos/{id}.
 func NewPhotoHandler(queries *db.Queries) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
+		idStr := r.PathValue("id")
+		if idStr == "" {
+			idStr = strings.TrimPrefix(r.URL.Path, "/photos/")
 		}
-		idStr := strings.TrimPrefix(r.URL.Path, "/photos/")
 		if idStr == "" {
 			http.NotFound(w, r)
 			return

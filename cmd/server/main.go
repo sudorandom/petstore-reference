@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
+	"connectrpc.com/validate"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
@@ -22,7 +22,6 @@ import (
 	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
 	"github.com/example/pets/internal/telemetry"
-	"github.com/example/pets/internal/validator"
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
 
@@ -46,12 +45,6 @@ func main() {
 				log.Printf("Error shutting down OpenTelemetry: %v", err)
 			}
 		}()
-	}
-
-	// Initialize Protovalidate
-	pv, err := protovalidate.New()
-	if err != nil {
-		log.Fatalf("Failed to initialize protovalidate: %v", err)
 	}
 
 	// Initialize Database Pool
@@ -79,7 +72,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize OpenTelemetry Connect interceptor: %v", err)
 	}
-	valInterceptor := validator.NewInterceptor(pv)
+	valInterceptor := validate.NewInterceptor()
 	authInterceptor := auth.NewInterceptor(auth.Config{
 		Enabled:      cfg.AuthEnabled,
 		DevMode:      cfg.DevMode,
@@ -137,7 +130,7 @@ func main() {
 	})
 
 	// Serve uploaded pet photos directly to browsers (instrumented with OpenTelemetry)
-	mux.Handle("/photos/", otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos"))
+	mux.Handle("GET /photos/{id}", otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos"))
 
 	var rootHandler http.Handler = mux
 

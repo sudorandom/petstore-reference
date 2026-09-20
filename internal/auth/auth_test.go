@@ -10,6 +10,8 @@ import (
 	petv1 "github.com/example/pets/gen/go/pet/v1"
 	"github.com/example/pets/gen/go/pet/v1/petv1connect"
 	"github.com/example/pets/internal/auth"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockPetService struct {
@@ -60,12 +62,8 @@ func TestAuthInterceptor(t *testing.T) {
 	t.Run("missing proxy headers or token", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
 		_, err := client.GetPet(ctx, req)
-		if err == nil {
-			t.Fatal("expected unauthenticated error, got nil")
-		}
-		if connect.CodeOf(err) != connect.CodeUnauthenticated {
-			t.Errorf("expected CodeUnauthenticated, got %v", connect.CodeOf(err))
-		}
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
 	})
 
 	t.Run("Google Cloud IAP headers", func(t *testing.T) {
@@ -73,18 +71,11 @@ func TestAuthInterceptor(t *testing.T) {
 		req.Header().Set("X-Goog-Authenticated-User-Email", "accounts.google.com:alice@example.com")
 		req.Header().Set("X-Goog-Authenticated-User-Id", "accounts.google.com:10987654321")
 		resp, err := client.GetPet(ctx, req)
-		if err != nil {
-			t.Fatalf("expected success with IAP headers, got %v", err)
-		}
-		if resp.Msg.Pet.Name != "TestPet" {
-			t.Errorf("expected pet name TestPet, got %s", resp.Msg.Pet.Name)
-		}
-		if svc.lastClaims == nil || svc.lastClaims.Email != "alice@example.com" {
-			t.Errorf("expected email alice@example.com, got %+v", svc.lastClaims)
-		}
-		if svc.lastClaims.Provider != "iap" {
-			t.Errorf("expected provider iap, got %s", svc.lastClaims.Provider)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "TestPet", resp.Msg.Pet.Name)
+		require.NotNil(t, svc.lastClaims)
+		assert.Equal(t, "alice@example.com", svc.lastClaims.Email)
+		assert.Equal(t, "iap", svc.lastClaims.Provider)
 	})
 
 	t.Run("OAuth2 Proxy headers", func(t *testing.T) {
@@ -93,44 +84,28 @@ func TestAuthInterceptor(t *testing.T) {
 		req.Header().Set("X-Forwarded-User", "bob123")
 		req.Header().Set("X-Forwarded-Groups", "engineering, devops")
 		resp, err := client.GetPet(ctx, req)
-		if err != nil {
-			t.Fatalf("expected success with OAuth2 Proxy headers, got %v", err)
-		}
-		if resp.Msg.Pet.Name != "TestPet" {
-			t.Errorf("expected pet name TestPet, got %s", resp.Msg.Pet.Name)
-		}
-		if svc.lastClaims == nil || svc.lastClaims.Email != "bob@example.com" {
-			t.Errorf("expected email bob@example.com, got %+v", svc.lastClaims)
-		}
-		if svc.lastClaims.Provider != "oauth2-proxy" {
-			t.Errorf("expected provider oauth2-proxy, got %s", svc.lastClaims.Provider)
-		}
-		if len(svc.lastClaims.Roles) != 2 || svc.lastClaims.Roles[0] != "engineering" {
-			t.Errorf("expected engineering role, got %+v", svc.lastClaims.Roles)
-		}
+		require.NoError(t, err)
+		assert.Equal(t, "TestPet", resp.Msg.Pet.Name)
+		require.NotNil(t, svc.lastClaims)
+		assert.Equal(t, "bob@example.com", svc.lastClaims.Email)
+		assert.Equal(t, "oauth2-proxy", svc.lastClaims.Provider)
+		assert.Equal(t, []string{"engineering", "devops"}, svc.lastClaims.Roles)
 	})
 
 	t.Run("valid service-to-service bearer token", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
 		req.Header().Set("Authorization", "Bearer valid-token-123")
 		_, err := client.GetPet(ctx, req)
-		if err != nil {
-			t.Fatalf("expected success, got %v", err)
-		}
-		if svc.lastClaims.Provider != "bearer" {
-			t.Errorf("expected provider bearer, got %s", svc.lastClaims.Provider)
-		}
+		require.NoError(t, err)
+		require.NotNil(t, svc.lastClaims)
+		assert.Equal(t, "bearer", svc.lastClaims.Provider)
 	})
 
 	t.Run("skipped public procedure", func(t *testing.T) {
 		req := connect.NewRequest(&petv1.ListPetsRequest{})
 		resp, err := client.ListPets(ctx, req)
-		if err != nil {
-			t.Fatalf("expected public endpoint to succeed, got %v", err)
-		}
-		if resp.Msg == nil {
-			t.Error("expected non-nil response")
-		}
+		require.NoError(t, err)
+		assert.NotNil(t, resp.Msg)
 	})
 
 	t.Run("dev mode automatic identity fallback", func(t *testing.T) {
@@ -151,12 +126,9 @@ func TestAuthInterceptor(t *testing.T) {
 		req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
 		// No headers sent whatsoever
 		_, err := devClient.GetPet(ctx, req)
-		if err != nil {
-			t.Fatalf("expected dev mode to succeed without credentials, got %v", err)
-		}
-		if svc.lastClaims == nil || svc.lastClaims.Provider != "dev" {
-			t.Errorf("expected dev provider claims, got %+v", svc.lastClaims)
-		}
+		require.NoError(t, err)
+		require.NotNil(t, svc.lastClaims)
+		assert.Equal(t, "dev", svc.lastClaims.Provider)
 	})
 }
 
@@ -175,15 +147,9 @@ func TestDevIdentityMiddleware(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if got := capturedReq.Header.Get("X-Goog-Authenticated-User-Email"); got != "accounts.google.com:local-dev@example.com" {
-			t.Errorf("expected IAP email header, got %s", got)
-		}
-		if got := capturedReq.Header.Get("X-Forwarded-Email"); got != "local-dev@example.com" {
-			t.Errorf("expected forwarded email header, got %s", got)
-		}
-		if got := capturedReq.Header.Get("X-Forwarded-User"); got != "local-dev-user" {
-			t.Errorf("expected forwarded user header, got %s", got)
-		}
+		assert.Equal(t, "accounts.google.com:local-dev@example.com", capturedReq.Header.Get("X-Goog-Authenticated-User-Email"))
+		assert.Equal(t, "local-dev@example.com", capturedReq.Header.Get("X-Forwarded-Email"))
+		assert.Equal(t, "local-dev-user", capturedReq.Header.Get("X-Forwarded-User"))
 	})
 
 	t.Run("preserves existing IAP headers", func(t *testing.T) {
@@ -199,12 +165,8 @@ func TestDevIdentityMiddleware(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if got := capturedReq.Header.Get("X-Goog-Authenticated-User-Email"); got != "accounts.google.com:custom@example.com" {
-			t.Errorf("expected custom email preserved, got %s", got)
-		}
-		if got := capturedReq.Header.Get("X-Forwarded-Email"); got != "" {
-			t.Errorf("expected forwarded email to remain unset, got %s", got)
-		}
+		assert.Equal(t, "accounts.google.com:custom@example.com", capturedReq.Header.Get("X-Goog-Authenticated-User-Email"))
+		assert.Empty(t, capturedReq.Header.Get("X-Forwarded-Email"))
 	})
 
 	t.Run("preserves existing Authorization header", func(t *testing.T) {
@@ -220,11 +182,7 @@ func TestDevIdentityMiddleware(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if got := capturedReq.Header.Get("X-Goog-Authenticated-User-Email"); got != "" {
-			t.Errorf("expected IAP email to remain unset, got %s", got)
-		}
-		if got := capturedReq.Header.Get("Authorization"); got != "Bearer custom-token" {
-			t.Errorf("expected Authorization header preserved, got %s", got)
-		}
+		assert.Empty(t, capturedReq.Header.Get("X-Goog-Authenticated-User-Email"))
+		assert.Equal(t, "Bearer custom-token", capturedReq.Header.Get("Authorization"))
 	})
 }

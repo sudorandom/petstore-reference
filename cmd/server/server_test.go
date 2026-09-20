@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/rs/cors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCORS_PreflightWithCredentials(t *testing.T) {
@@ -33,17 +35,8 @@ func TestCORS_PreflightWithCredentials(t *testing.T) {
 	c.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(w, req)
 
 	resp := w.Result()
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 or 204, got %d", resp.StatusCode)
-	}
+	require.True(t, resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK)
 
-	allowOrigin := resp.Header.Get("Access-Control-Allow-Origin")
-	if allowOrigin != "https://localhost:4321" {
-		t.Errorf("expected Access-Control-Allow-Origin: https://localhost:4321, got %q", allowOrigin)
-	}
-
-	allowCreds := resp.Header.Get("Access-Control-Allow-Credentials")
-	if allowCreds != "true" {
-		t.Errorf("expected Access-Control-Allow-Credentials: true, got %q", allowCreds)
-	}
+	assert.Equal(t, "https://localhost:4321", resp.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
 }

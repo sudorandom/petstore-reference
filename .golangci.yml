@@ -2,10 +2,13 @@ version: "2"
 linters:
   enable:
     - gosec
+    - testifylint
   settings:
     gosec:
       severity: medium
       confidence: medium
+    testifylint:
+      enable-all: true
   exclusions:
     generated: lax
     presets:

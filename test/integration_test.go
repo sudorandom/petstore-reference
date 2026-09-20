@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
+	"connectrpc.com/validate"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	pgmodule "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -22,7 +24,6 @@ import (
 	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
 	"github.com/example/pets/internal/telemetry"
-	"github.com/example/pets/internal/validator"
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
 
@@ -42,12 +43,26 @@ func init() {
 	}
 }
 
-func TestPostgres_PetService_Integration(t *testing.T) {
-	ctx := context.Background()
+type PetServiceIntegrationTestSuite struct {
+	suite.Suite
+
+	ctx              context.Context
+	cancel           context.CancelFunc
+	pgContainer      *pgmodule.PostgresContainer
+	pool             *pgxpool.Pool
+	server           *httptest.Server
+	client           petv1connect.PetServiceClient
+	createdPetID     string
+	uploadedPhotoID  string
+	uploadedPhotoURL string
+}
+
+func (s *PetServiceIntegrationTestSuite) SetupSuite() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	dbURL := os.Getenv("DATABASE_URL")
 
 	if dbURL == "" {
-		pgContainer, err := pgmodule.Run(ctx,
+		pgContainer, err := pgmodule.Run(s.ctx,
 			"postgres:17-alpine",
 			pgmodule.WithDatabase("pets_db"),
 			pgmodule.WithUsername("postgres"),
@@ -59,43 +74,30 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 			),
 		)
 		if err != nil {
-			t.Skipf("Skipping integration test: Docker/Testcontainers not available: %v", err)
+			s.T().Skipf("Skipping integration test: Docker/Testcontainers not available: %v", err)
 			return
 		}
-		defer func() {
-			_ = testcontainers.TerminateContainer(pgContainer)
-		}()
+		s.pgContainer = pgContainer
 
-		dbURL, err = pgContainer.ConnectionString(ctx, "sslmode=disable")
-		if err != nil {
-			t.Fatalf("failed to get connection string from testcontainer: %v", err)
-		}
+		var errConn error
+		dbURL, errConn = pgContainer.ConnectionString(s.ctx, "sslmode=disable")
+		s.Require().NoError(errConn, "failed to get connection string from testcontainer")
 	}
 
-	pool, err := db.NewPool(ctx, dbURL)
-	if err != nil {
-		t.Fatalf("failed to connect to database at %s: %v", dbURL, err)
-	}
-	defer pool.Close()
+	pool, err := db.NewPool(s.ctx, dbURL)
+	s.Require().NoError(err, "failed to connect to database at %s", dbURL)
+	s.pool = pool
 
-	if err := db.Migrate(ctx, pool); err != nil {
-		t.Fatalf("failed to apply database migrations: %v", err)
-	}
-
-	pv, err := protovalidate.New()
-	if err != nil {
-		t.Fatalf("failed to create protovalidate: %v", err)
-	}
+	err = db.Migrate(s.ctx, pool)
+	s.Require().NoError(err, "failed to apply database migrations")
 
 	queries := db.New(pool)
 	service := pet.NewService(queries)
 
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
-	if err != nil {
-		t.Fatalf("failed to create otel interceptor: %v", err)
-	}
+	s.Require().NoError(err, "failed to create otel interceptor")
 
-	valInterceptor := validator.NewInterceptor(pv)
+	valInterceptor := validate.NewInterceptor()
 	authInterceptor := auth.NewInterceptor(auth.Config{
 		Enabled:      true,
 		StaticTokens: []string{"test-token"},
@@ -109,20 +111,33 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
-	mux.Handle("/photos/", pet.NewPhotoHandler(queries))
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	mux.Handle("GET /photos/{id}", pet.NewPhotoHandler(queries))
+	s.server = httptest.NewServer(mux)
 
-	// ConnectRPC client
-	client := petv1connect.NewPetServiceClient(
-		server.Client(),
-		server.URL,
+	s.client = petv1connect.NewPetServiceClient(
+		s.server.Client(),
+		s.server.URL,
 		connect.WithCodec(&protojsonxconnect.Codec{}),
 	)
+}
 
-	var createdPetID string
+func (s *PetServiceIntegrationTestSuite) TearDownSuite() {
+	if s.server != nil {
+		s.server.Close()
+	}
+	if s.pool != nil {
+		s.pool.Close()
+	}
+	if s.pgContainer != nil {
+		_ = testcontainers.TerminateContainer(s.pgContainer)
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
+}
 
-	t.Run("CreatePet", func(t *testing.T) {
+func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
+	s.Run("CreatePet", func() {
 		req := connect.NewRequest(&petv1.CreatePetRequest{
 			Name:               "Milo",
 			Species:            "Dog",
@@ -134,72 +149,54 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.CreatePet(ctx, req)
-		if err != nil {
-			t.Fatalf("CreatePet failed: %v", err)
-		}
+		resp, err := s.client.CreatePet(s.ctx, req)
+		s.Require().NoError(err, "CreatePet failed")
+		s.Require().NotNil(resp.Msg)
+		s.Require().NotNil(resp.Msg.Pet)
 
-		if resp.Msg.Pet.Name != "Milo" {
-			t.Errorf("expected pet name Milo, got %s", resp.Msg.Pet.Name)
-		}
-		if resp.Msg.Pet.BirthDate != "2023-05-10" {
-			t.Errorf("expected birth date 2023-05-10, got %s", resp.Msg.Pet.BirthDate)
-		}
-		if resp.Msg.Pet.BirthDateEstimated {
-			t.Errorf("expected birth_date_estimated to be false")
-		}
-		if resp.Msg.Pet.Id == "" {
-			t.Fatal("expected non-empty pet ID")
-		}
-		if resp.Msg.Pet.CreatedBy == "" || resp.Msg.Pet.ModifiedBy == "" {
-			t.Errorf("expected created_by and modified_by to be populated, got created_by=%q, modified_by=%q", resp.Msg.Pet.CreatedBy, resp.Msg.Pet.ModifiedBy)
-		}
-		if resp.Msg.Pet.CreatedAt == nil || resp.Msg.Pet.ModifiedAt == nil {
-			t.Errorf("expected created_at and modified_at to be non-nil")
-		}
-		createdPetID = resp.Msg.Pet.Id
+		s.Equal("Milo", resp.Msg.Pet.Name)
+		s.Equal("2023-05-10", resp.Msg.Pet.BirthDate)
+		s.False(resp.Msg.Pet.BirthDateEstimated)
+		s.NotEmpty(resp.Msg.Pet.Id)
+		s.NotEmpty(resp.Msg.Pet.CreatedBy)
+		s.NotEmpty(resp.Msg.Pet.ModifiedBy)
+		s.NotNil(resp.Msg.Pet.CreatedAt)
+		s.NotNil(resp.Msg.Pet.ModifiedAt)
+
+		s.createdPetID = resp.Msg.Pet.Id
 	})
 
-	t.Run("GetPet", func(t *testing.T) {
-		if createdPetID == "" {
-			t.Skip("skipping GetPet because CreatePet did not succeed")
-		}
+	s.Run("GetPet", func() {
+		s.Require().NotEmpty(s.createdPetID, "skipping GetPet because CreatePet did not succeed")
 
-		req := connect.NewRequest(&petv1.GetPetRequest{Id: createdPetID})
+		req := connect.NewRequest(&petv1.GetPetRequest{Id: s.createdPetID})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.GetPet(ctx, req)
-		if err != nil {
-			t.Fatalf("GetPet failed: %v", err)
-		}
-		if resp.Msg.Pet.Id != createdPetID {
-			t.Errorf("expected pet ID %s, got %s", createdPetID, resp.Msg.Pet.Id)
-		}
+		resp, err := s.client.GetPet(s.ctx, req)
+		s.Require().NoError(err, "GetPet failed")
+		s.Require().NotNil(resp.Msg)
+		s.Require().NotNil(resp.Msg.Pet)
+		s.Equal(s.createdPetID, resp.Msg.Pet.Id)
 	})
 
-	t.Run("ListPets", func(t *testing.T) {
+	s.Run("ListPets", func() {
 		req := connect.NewRequest(&petv1.ListPetsRequest{
 			Species:  "Dog",
 			PageSize: 10,
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.ListPets(ctx, req)
-		if err != nil {
-			t.Fatalf("ListPets failed: %v", err)
-		}
-		if len(resp.Msg.Pets) == 0 {
-			t.Errorf("expected at least 1 pet in list")
-		}
+		resp, err := s.client.ListPets(s.ctx, req)
+		s.Require().NoError(err, "ListPets failed")
+		s.Require().NotNil(resp.Msg)
+		s.NotEmpty(resp.Msg.Pets)
 	})
 
-	t.Run("UpdatePet", func(t *testing.T) {
-		if createdPetID == "" {
-			t.Skip("skipping UpdatePet")
-		}
+	s.Run("UpdatePet", func() {
+		s.Require().NotEmpty(s.createdPetID, "skipping UpdatePet")
 
 		req := connect.NewRequest(&petv1.UpdatePetRequest{
-			Id:                 createdPetID,
+			Id:                 s.createdPetID,
 			Name:               "Milo The Great",
 			Species:            "Dog",
 			BirthDate:          "2022-04-12",
@@ -210,148 +207,109 @@ func TestPostgres_PetService_Integration(t *testing.T) {
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.UpdatePet(ctx, req)
-		if err != nil {
-			t.Fatalf("UpdatePet failed: %v", err)
-		}
-		if resp.Msg.Pet.Name != "Milo The Great" {
-			t.Errorf("expected updated name, got %s", resp.Msg.Pet.Name)
-		}
-		if resp.Msg.Pet.BirthDate != "2022-04-12" {
-			t.Errorf("expected birth date 2022-04-12, got %s", resp.Msg.Pet.BirthDate)
-		}
-		if !resp.Msg.Pet.BirthDateEstimated {
-			t.Errorf("expected birth_date_estimated to be true")
-		}
-		if resp.Msg.Pet.Status != petv1.PetStatus_PET_STATUS_ADOPTED {
-			t.Errorf("expected status ADOPTED, got %v", resp.Msg.Pet.Status)
-		}
+		resp, err := s.client.UpdatePet(s.ctx, req)
+		s.Require().NoError(err, "UpdatePet failed")
+		s.Require().NotNil(resp.Msg)
+		s.Require().NotNil(resp.Msg.Pet)
+		s.Equal("Milo The Great", resp.Msg.Pet.Name)
+		s.Equal("2022-04-12", resp.Msg.Pet.BirthDate)
+		s.True(resp.Msg.Pet.BirthDateEstimated)
+		s.Equal(petv1.PetStatus_PET_STATUS_ADOPTED, resp.Msg.Pet.Status)
 	})
 
-	var uploadedPhotoID string
-	var uploadedPhotoURL string
-
-	t.Run("UploadPetPhoto", func(t *testing.T) {
-		if createdPetID == "" {
-			t.Skip("skipping UploadPetPhoto")
-		}
+	s.Run("UploadPetPhoto", func() {
+		s.Require().NotEmpty(s.createdPetID, "skipping UploadPetPhoto")
 
 		dummyPhoto := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG header bytes
 
 		req := connect.NewRequest(&petv1.UploadPetPhotoRequest{
-			PetId:    createdPetID,
+			PetId:    s.createdPetID,
 			Data:     dummyPhoto,
 			MimeType: "image/jpeg",
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.UploadPetPhoto(ctx, req)
-		if err != nil {
-			t.Fatalf("UploadPetPhoto failed: %v", err)
-		}
+		resp, err := s.client.UploadPetPhoto(s.ctx, req)
+		s.Require().NoError(err, "UploadPetPhoto failed")
+		s.Require().NotNil(resp.Msg)
+		s.NotEmpty(resp.Msg.PhotoId)
 
-		if resp.Msg.PhotoId == "" {
-			t.Fatal("expected non-empty photo ID")
-		}
-		uploadedPhotoID = resp.Msg.PhotoId
-		uploadedPhotoURL = resp.Msg.PhotoUrl
+		s.uploadedPhotoID = resp.Msg.PhotoId
+		s.uploadedPhotoURL = resp.Msg.PhotoUrl
 
-		expectedPrefix := "/photos/" + uploadedPhotoID
-		if resp.Msg.PhotoUrl != expectedPrefix {
-			t.Errorf("expected photo URL %s, got %s", expectedPrefix, resp.Msg.PhotoUrl)
-		}
-
-		// Verify pet returned has the new photo URL
-		found := false
-		for _, u := range resp.Msg.Pet.PhotoUrls {
-			if u == uploadedPhotoURL {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("expected pet.PhotoUrls to contain %s, got %v", uploadedPhotoURL, resp.Msg.Pet.PhotoUrls)
-		}
+		expectedPrefix := "/photos/" + s.uploadedPhotoID
+		s.Equal(expectedPrefix, resp.Msg.PhotoUrl)
+		s.Contains(resp.Msg.Pet.PhotoUrls, s.uploadedPhotoURL)
 	})
 
-	t.Run("GetPetPhoto", func(t *testing.T) {
-		if uploadedPhotoID == "" {
-			t.Skip("skipping GetPetPhoto")
-		}
+	s.Run("GetPetPhoto", func() {
+		s.Require().NotEmpty(s.uploadedPhotoID, "skipping GetPetPhoto")
 
-		req := connect.NewRequest(&petv1.GetPetPhotoRequest{PhotoId: uploadedPhotoID})
+		req := connect.NewRequest(&petv1.GetPetPhotoRequest{PhotoId: s.uploadedPhotoID})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.GetPetPhoto(ctx, req)
-		if err != nil {
-			t.Fatalf("GetPetPhoto failed: %v", err)
-		}
-
-		if resp.Msg.PhotoId != uploadedPhotoID {
-			t.Errorf("expected photo ID %s, got %s", uploadedPhotoID, resp.Msg.PhotoId)
-		}
-		if resp.Msg.PetId != createdPetID {
-			t.Errorf("expected pet ID %s, got %s", createdPetID, resp.Msg.PetId)
-		}
-		if resp.Msg.MimeType != "image/jpeg" {
-			t.Errorf("expected mime type image/jpeg, got %s", resp.Msg.MimeType)
-		}
-		if len(resp.Msg.Data) != 10 {
-			t.Errorf("expected 10 bytes of data, got %d", len(resp.Msg.Data))
-		}
+		resp, err := s.client.GetPetPhoto(s.ctx, req)
+		s.Require().NoError(err, "GetPetPhoto failed")
+		s.Require().NotNil(resp.Msg)
+		s.Equal(s.uploadedPhotoID, resp.Msg.PhotoId)
+		s.Equal(s.createdPetID, resp.Msg.PetId)
+		s.Equal("image/jpeg", resp.Msg.MimeType)
+		s.Len(resp.Msg.Data, 10)
 	})
 
-	t.Run("ServePetPhotoHTTP", func(t *testing.T) {
-		if uploadedPhotoURL == "" {
-			t.Skip("skipping ServePetPhotoHTTP")
-		}
+	s.Run("ServePetPhotoHTTP", func() {
+		s.Require().NotEmpty(s.uploadedPhotoURL, "skipping ServePetPhotoHTTP")
 
-		httpResp, err := server.Client().Get(server.URL + uploadedPhotoURL)
-		if err != nil {
-			t.Fatalf("HTTP GET photo failed: %v", err)
-		}
+		photoURL := s.server.URL + s.uploadedPhotoURL
+
+		// GET request
+		httpResp, err := s.server.Client().Get(photoURL)
+		s.Require().NoError(err, "HTTP GET photo failed")
 		defer httpResp.Body.Close()
 
-		if httpResp.StatusCode != http.StatusOK {
-			t.Errorf("expected HTTP 200, got %d", httpResp.StatusCode)
-		}
-		if ct := httpResp.Header.Get("Content-Type"); ct != "image/jpeg" {
-			t.Errorf("expected Content-Type image/jpeg, got %s", ct)
-		}
+		s.Equal(http.StatusOK, httpResp.StatusCode)
+		s.Equal("image/jpeg", httpResp.Header.Get("Content-Type"))
+
 		body, err := io.ReadAll(httpResp.Body)
-		if err != nil {
-			t.Fatalf("failed to read response body: %v", err)
-		}
-		if len(body) != 10 {
-			t.Errorf("expected 10 bytes, got %d", len(body))
-		}
+		s.Require().NoError(err, "failed to read response body")
+		s.Len(body, 10)
+
+		// HEAD request - handled automatically by http.ServeMux when mounted with GET
+		headResp, err := s.server.Client().Head(photoURL)
+		s.Require().NoError(err, "HTTP HEAD photo failed")
+		defer headResp.Body.Close()
+
+		s.Equal(http.StatusOK, headResp.StatusCode)
+		s.Equal("image/jpeg", headResp.Header.Get("Content-Type"))
+
+		// POST request - rejected with 405 Method Not Allowed
+		postResp, err := s.server.Client().Post(photoURL, "text/plain", nil)
+		s.Require().NoError(err, "HTTP POST photo failed")
+		defer postResp.Body.Close()
+
+		s.Equal(http.StatusMethodNotAllowed, postResp.StatusCode)
 	})
 
-	t.Run("DeletePet", func(t *testing.T) {
-		if createdPetID == "" {
-			t.Skip("skipping DeletePet")
-		}
+	s.Run("DeletePet", func() {
+		s.Require().NotEmpty(s.createdPetID, "skipping DeletePet")
 
-		req := connect.NewRequest(&petv1.DeletePetRequest{Id: createdPetID})
+		req := connect.NewRequest(&petv1.DeletePetRequest{Id: s.createdPetID})
 		req.Header().Set("Authorization", "Bearer test-token")
 
-		resp, err := client.DeletePet(ctx, req)
-		if err != nil {
-			t.Fatalf("DeletePet failed: %v", err)
-		}
-		if !resp.Msg.Success {
-			t.Errorf("expected success true")
-		}
+		resp, err := s.client.DeletePet(s.ctx, req)
+		s.Require().NoError(err, "DeletePet failed")
+		s.Require().NotNil(resp.Msg)
+		s.True(resp.Msg.Success)
 
 		// Verify pet is gone
-		getReq := connect.NewRequest(&petv1.GetPetRequest{Id: createdPetID})
+		getReq := connect.NewRequest(&petv1.GetPetRequest{Id: s.createdPetID})
 		getReq.Header().Set("Authorization", "Bearer test-token")
-		_, err = client.GetPet(ctx, getReq)
-		if err == nil {
-			t.Fatalf("expected pet to be not found, but GetPet succeeded")
-		}
-		if connect.CodeOf(err) != connect.CodeNotFound {
-			t.Errorf("expected CodeNotFound, got %v", connect.CodeOf(err))
-		}
+		_, err = s.client.GetPet(s.ctx, getReq)
+		s.Require().Error(err, "expected pet to be not found")
+		s.Equal(connect.CodeNotFound, connect.CodeOf(err))
 	})
+}
+
+func TestPetServiceIntegrationTestSuite(t *testing.T) {
+	suite.Run(t, new(PetServiceIntegrationTestSuite))
 }

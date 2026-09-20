@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -24,12 +26,8 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	os.Unsetenv("OTEL_TRACES_EXPORTER")
 
 	cfg := LoadConfigFromEnv()
-	if cfg.ServiceName != "pets-service" {
-		t.Errorf("expected default service name pets-service, got %s", cfg.ServiceName)
-	}
-	if cfg.ExporterType != "none" {
-		t.Errorf("expected default exporter none, got %s", cfg.ExporterType)
-	}
+	assert.Equal(t, "pets-service", cfg.ServiceName)
+	assert.Equal(t, "none", cfg.ExporterType)
 
 	// Test custom env
 	_ = os.Setenv("OTEL_SERVICE_NAME", "custom-petstore")
@@ -40,12 +38,8 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	}()
 
 	cfg = LoadConfigFromEnv()
-	if cfg.ServiceName != "custom-petstore" {
-		t.Errorf("expected custom service name custom-petstore, got %s", cfg.ServiceName)
-	}
-	if cfg.ExporterType != "otlp" {
-		t.Errorf("expected exporter otlp, got %s", cfg.ExporterType)
-	}
+	assert.Equal(t, "custom-petstore", cfg.ServiceName)
+	assert.Equal(t, "otlp", cfg.ExporterType)
 }
 
 func TestInitAndConnectInterceptor(t *testing.T) {
@@ -61,12 +55,8 @@ func TestInitAndConnectInterceptor(t *testing.T) {
 	))
 
 	interceptor, err := NewConnectInterceptor()
-	if err != nil {
-		t.Fatalf("failed to create connect interceptor: %v", err)
-	}
-	if interceptor == nil {
-		t.Fatal("expected non-nil interceptor")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, interceptor)
 
 	// Create a dummy service to test interceptor with incoming W3C traceparent
 	dummySvc := &mockPetService{}
@@ -89,30 +79,22 @@ func TestInitAndConnectInterceptor(t *testing.T) {
 	req.Header().Set("traceparent", traceparent)
 
 	_, err = client.GetPet(ctx, req)
-	if err != nil {
-		t.Fatalf("GetPet RPC failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	spans := spanRecorder.Ended()
-	if len(spans) == 0 {
-		t.Fatal("expected at least one span recorded")
-	}
+	require.NotEmpty(t, spans)
 
 	// Verify that the backend span adopted the frontend trace ID
 	var foundAdoptedTrace bool
 	for _, span := range spans {
 		if span.SpanContext().TraceID().String() == frontendTraceID {
 			foundAdoptedTrace = true
-			if span.Parent().SpanID().String() != frontendSpanID {
-				t.Errorf("expected parent span ID %s, got %s", frontendSpanID, span.Parent().SpanID().String())
-			}
+			assert.Equal(t, frontendSpanID, span.Parent().SpanID().String())
 			break
 		}
 	}
 
-	if !foundAdoptedTrace {
-		t.Errorf("expected backend span to adopt frontend trace ID %s, recorded spans: %+v", frontendTraceID, spans)
-	}
+	assert.True(t, foundAdoptedTrace, "expected backend span to adopt frontend trace ID %s", frontendTraceID)
 }
 
 // mockPetService implements petv1connect.PetServiceHandler for testing
