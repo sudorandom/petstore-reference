@@ -70,19 +70,15 @@ run:
 
 # Run FauxRPC mock server with HTTPS, protobuf descriptor image, OpenAPI specification, and normal stubs
 fauxrpc:
-    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/normal --addr=127.0.0.1:6660 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
+    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/normal --addr=127.0.0.1:8080 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem --log-level=debug
 
 # Run FauxRPC mock server configured with failure stubs to test error handling
 fauxrpc-fail:
-    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/failures --addr=127.0.0.1:6660 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
+    fauxrpc run --schema=gen/image.binpb,gen/openapi/pet/v1/pet.openapi.yaml --stubs=stubs/failures --addr=127.0.0.1:8080 --https --cert=.certs/cert.pem --cert-key=.certs/key.pem
 
-# Run Vite React frontend dev server against real Go backend
+# Run Vite React frontend dev server against backend (Go server or FauxRPC on :8080)
 web-dev:
     cd web && pnpm dev
-
-# Run Vite React frontend dev server against FauxRPC mock server
-web-mock:
-    cd web && pnpm dev:mock
 
 # Run frontend tests against FauxRPC mock server
 test-web:

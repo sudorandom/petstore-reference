@@ -1,5 +1,0 @@
-stubs:
-  - id: upload-pet-photo-resource-exhausted
-    target: pet.v1.PetService/UploadPetPhoto
-    error_code: 8
-    error_message: "resource exhausted: maximum storage quota reached for pet photos"

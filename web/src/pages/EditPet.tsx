@@ -6,7 +6,6 @@ import { PetService, PetStatus } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
 import { PetFormFields } from '../components/PetFormFields';
 import { errorMessage } from '../lib/errors';
-import { acceptedPhotoTypes, readPhoto } from '../lib/photos';
 
 function formatDate(ts?: { seconds: bigint }): string {
   if (!ts || !ts.seconds) return 'N/A';
@@ -37,8 +36,8 @@ export const EditPet: React.FC = () => {
   const [birthDateEstimated, setBirthDateEstimated] = useState(false);
   const [status, setStatus] = useState<PetStatus>(PetStatus.AVAILABLE);
   const [tags, setTags] = useState('');
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
 
   const pet = data?.pet;
 
@@ -50,6 +49,7 @@ export const EditPet: React.FC = () => {
       setBirthDateEstimated(pet.birthDateEstimated);
       setStatus(pet.status || PetStatus.AVAILABLE);
       setTags((pet.tags || []).join(', '));
+      setPhotoUrls(pet.photoUrls || []);
     }
   }, [pet]);
 
@@ -62,35 +62,6 @@ export const EditPet: React.FC = () => {
       setValidationError(errorMessage(err));
     },
   });
-
-  const uploadPhotoMutation = useMutation(PetService.method.uploadPetPhoto, {
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-    },
-    onError: (err) => {
-      setValidationError(errorMessage(err));
-    },
-  });
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !pet) return;
-
-    setValidationError(null);
-    setIsUploading(true);
-    try {
-      await uploadPhotoMutation.mutateAsync({
-        petId: pet.id,
-        data: await readPhoto(file),
-        mimeType: file.type,
-      });
-    } catch (err: unknown) {
-      setValidationError(errorMessage(err));
-    } finally {
-      setIsUploading(false);
-      e.target.value = '';
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +79,7 @@ export const EditPet: React.FC = () => {
       birthDateEstimated,
       status,
       tags: tagList,
+      photoUrls,
     });
   };
 
@@ -173,30 +145,11 @@ export const EditPet: React.FC = () => {
         <form onSubmit={handleSubmit}>
           <PetFormFields
             name={name} species={species} birthDate={birthDate} birthDateEstimated={birthDateEstimated}
-            status={status} tags={tags} onNameChange={setName} onSpeciesChange={setSpecies}
+            status={status} tags={tags} photoUrls={photoUrls}
+            onNameChange={setName} onSpeciesChange={setSpecies}
             onBirthDateChange={setBirthDate} onBirthDateEstimatedChange={setBirthDateEstimated}
-            onStatusChange={setStatus} onTagsChange={setTags}
+            onStatusChange={setStatus} onTagsChange={setTags} onPhotoUrlsChange={setPhotoUrls}
           />
-
-          <div className="form-group">
-            <div style={{ marginTop: '0.75rem' }}>
-              <label htmlFor="pet-upload-photo" style={{ fontSize: '0.85rem' }}>
-                Upload Photo to Database
-              </label>
-              <input
-                type="file"
-                id="pet-upload-photo"
-                accept={acceptedPhotoTypes.join(',')}
-                onChange={handlePhotoUpload}
-                disabled={isUploading}
-              />
-              <div className="helper-text">
-                {isUploading
-                  ? 'Uploading photo...'
-                  : 'JPEG, PNG, WebP, or GIF up to 5MB (stored in PostgreSQL)'}
-              </div>
-            </div>
-          </div>
 
           <div
             style={{

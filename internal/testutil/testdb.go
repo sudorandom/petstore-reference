@@ -91,7 +91,7 @@ func StartTestDB(ctx context.Context) (*TestDB, error) {
 
 // TruncateTables truncates all application tables between tests to ensure test isolation.
 func (tdb *TestDB) TruncateTables(ctx context.Context) error {
-	_, err := tdb.Pool.Exec(ctx, "TRUNCATE TABLE pet_photos, pets RESTART IDENTITY CASCADE;")
+	_, err := tdb.Pool.Exec(ctx, "TRUNCATE TABLE pets RESTART IDENTITY CASCADE;")
 	if err != nil {
 		return fmt.Errorf("failed to truncate tables: %w", err)
 	}

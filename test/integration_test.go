@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +14,6 @@ import (
 	petv1 "github.com/example/pets/gen/go/pet/v1"
 	"github.com/example/pets/gen/go/pet/v1/petv1connect"
 	"github.com/example/pets/internal/auth"
-	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
 	"github.com/example/pets/internal/telemetry"
 	"github.com/example/pets/internal/testutil"
@@ -25,15 +23,13 @@ import (
 type PetServiceIntegrationTestSuite struct {
 	suite.Suite
 
-	ctx              context.Context
-	cancel           context.CancelFunc
-	testDB           *testutil.TestDB
-	pool             *pgxpool.Pool
-	server           *httptest.Server
-	client           petv1connect.PetServiceClient
-	createdPetID     string
-	uploadedPhotoID  string
-	uploadedPhotoURL string
+	ctx          context.Context
+	cancel       context.CancelFunc
+	testDB       *testutil.TestDB
+	pool         *pgxpool.Pool
+	server       *httptest.Server
+	client       petv1connect.PetServiceClient
+	createdPetID string
 }
 
 func (s *PetServiceIntegrationTestSuite) SetupSuite() {
@@ -47,7 +43,6 @@ func (s *PetServiceIntegrationTestSuite) SetupSuite() {
 	s.testDB = testDB
 	s.pool = testDB.Pool
 
-	queries := db.New(s.pool)
 	petHandler := pet.NewHandler(s.pool)
 
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
@@ -68,7 +63,6 @@ func (s *PetServiceIntegrationTestSuite) SetupSuite() {
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
-	mux.Handle("GET /photos/{id}", auth.Middleware(authCfg)(pet.NewPhotoHandler(queries)))
 	s.server = httptest.NewServer(mux)
 
 	s.client = petv1connect.NewPetServiceClient(
@@ -105,6 +99,7 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 			BirthDateEstimated: false,
 			Status:             petv1.PetStatus_PET_STATUS_AVAILABLE,
 			Tags:               []string{"friendly", "playful"},
+			PhotoUrls:          []string{"https://example.com/milo1.jpg"},
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
@@ -116,6 +111,7 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 		s.Equal("Milo", resp.Msg.Pet.Name)
 		s.Equal("2023-05-10", resp.Msg.Pet.BirthDate)
 		s.False(resp.Msg.Pet.BirthDateEstimated)
+		s.Equal([]string{"https://example.com/milo1.jpg"}, resp.Msg.Pet.PhotoUrls)
 		s.NotEmpty(resp.Msg.Pet.Id)
 		s.NotEmpty(resp.Msg.Pet.CreatedBy)
 		s.NotEmpty(resp.Msg.Pet.ModifiedBy)
@@ -136,6 +132,7 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 		s.Require().NotNil(resp.Msg)
 		s.Require().NotNil(resp.Msg.Pet)
 		s.Equal(s.createdPetID, resp.Msg.Pet.Id)
+		s.Equal([]string{"https://example.com/milo1.jpg"}, resp.Msg.Pet.PhotoUrls)
 	})
 
 	s.Run("ListPets", func() {
@@ -162,6 +159,7 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 			BirthDateEstimated: true,
 			Status:             petv1.PetStatus_PET_STATUS_ADOPTED,
 			Tags:               []string{"adopted", "happy"},
+			PhotoUrls:          []string{"https://example.com/milo-updated.jpg"},
 		})
 		req.Header().Set("Authorization", "Bearer test-token")
 
@@ -173,94 +171,7 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 		s.Equal("2022-04-12", resp.Msg.Pet.BirthDate)
 		s.True(resp.Msg.Pet.BirthDateEstimated)
 		s.Equal(petv1.PetStatus_PET_STATUS_ADOPTED, resp.Msg.Pet.Status)
-	})
-
-	s.Run("UploadPetPhoto", func() {
-		s.Require().NotEmpty(s.createdPetID, "skipping UploadPetPhoto")
-
-		dummyPhoto := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG header bytes
-
-		req := connect.NewRequest(&petv1.UploadPetPhotoRequest{
-			PetId:    s.createdPetID,
-			Data:     dummyPhoto,
-			MimeType: "image/jpeg",
-		})
-		req.Header().Set("Authorization", "Bearer test-token")
-
-		resp, err := s.client.UploadPetPhoto(s.ctx, req)
-		s.Require().NoError(err, "UploadPetPhoto failed")
-		s.Require().NotNil(resp.Msg)
-		s.NotEmpty(resp.Msg.PhotoId)
-
-		s.uploadedPhotoID = resp.Msg.PhotoId
-		s.uploadedPhotoURL = resp.Msg.PhotoUrl
-
-		expectedPrefix := "/photos/" + s.uploadedPhotoID
-		s.Equal(expectedPrefix, resp.Msg.PhotoUrl)
-		s.Require().Len(resp.Msg.Pet.Photos, 1)
-		s.Equal(s.uploadedPhotoID, resp.Msg.Pet.Photos[0].Id)
-		s.Equal(s.uploadedPhotoURL, resp.Msg.Pet.Photos[0].Url)
-	})
-
-	s.Run("ServePetPhotoHTTP", func() {
-		s.Require().NotEmpty(s.uploadedPhotoURL, "skipping ServePetPhotoHTTP")
-
-		photoURL := s.server.URL + s.uploadedPhotoURL
-
-		// GET request
-		httpReq, err := http.NewRequestWithContext(s.ctx, http.MethodGet, photoURL, nil)
-		s.Require().NoError(err)
-		httpReq.Header.Set("Authorization", "Bearer test-token")
-		httpResp, err := s.server.Client().Do(httpReq)
-		s.Require().NoError(err, "HTTP GET photo failed")
-		defer httpResp.Body.Close()
-
-		s.Equal(http.StatusOK, httpResp.StatusCode)
-		s.Equal("image/jpeg", httpResp.Header.Get("Content-Type"))
-		s.Equal("private, max-age=86400", httpResp.Header.Get("Cache-Control"))
-
-		body, err := io.ReadAll(httpResp.Body)
-		s.Require().NoError(err, "failed to read response body")
-		s.Len(body, 10)
-
-		// HEAD request - handled automatically by http.ServeMux when mounted with GET
-		headReq, err := http.NewRequestWithContext(s.ctx, http.MethodHead, photoURL, nil)
-		s.Require().NoError(err)
-		headReq.Header.Set("Authorization", "Bearer test-token")
-		headResp, err := s.server.Client().Do(headReq)
-		s.Require().NoError(err, "HTTP HEAD photo failed")
-		defer headResp.Body.Close()
-
-		s.Equal(http.StatusOK, headResp.StatusCode)
-		s.Equal("image/jpeg", headResp.Header.Get("Content-Type"))
-
-		// POST request - rejected with 405 Method Not Allowed
-		postResp, err := s.server.Client().Post(photoURL, "text/plain", nil)
-		s.Require().NoError(err, "HTTP POST photo failed")
-		defer postResp.Body.Close()
-
-		s.Equal(http.StatusMethodNotAllowed, postResp.StatusCode)
-	})
-
-	s.Run("DeletePetPhoto", func() {
-		s.Require().NotEmpty(s.uploadedPhotoID, "skipping DeletePetPhoto")
-
-		req := connect.NewRequest(&petv1.DeletePetPhotoRequest{PhotoId: s.uploadedPhotoID})
-		req.Header().Set("Authorization", "Bearer test-token")
-
-		resp, err := s.client.DeletePetPhoto(s.ctx, req)
-		s.Require().NoError(err, "DeletePetPhoto failed")
-		s.Require().NotNil(resp.Msg)
-		s.True(resp.Msg.Success)
-
-		// Verify photo is gone
-		httpReq, reqErr := http.NewRequestWithContext(s.ctx, http.MethodGet, s.server.URL+s.uploadedPhotoURL, nil)
-		s.Require().NoError(reqErr)
-		httpReq.Header.Set("Authorization", "Bearer test-token")
-		httpResp, reqErr := s.server.Client().Do(httpReq)
-		s.Require().NoError(reqErr)
-		defer httpResp.Body.Close()
-		s.Equal(http.StatusNotFound, httpResp.StatusCode)
+		s.Equal([]string{"https://example.com/milo-updated.jpg"}, resp.Msg.Pet.PhotoUrls)
 	})
 
 	s.Run("DeletePet", func() {

@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@connectrpc/connect-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { PetService, PetStatus } from '../gen/pet/v1/pet_pb';
 import { Layout } from '../components/Layout';
+import { PetImage } from '../components/PetImage';
 import { formatTimestamp, calculateAge } from '../lib/date';
 
 export const PetList: React.FC = () => {
@@ -225,20 +226,11 @@ export const PetList: React.FC = () => {
               <div key={pet.id} className="pet-item">
                 <div className="pet-header">
                   <div className="pet-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    {pet.photos.length > 0 && (
-                      <img
-                        src={pet.photos[0].url}
-                        alt={pet.name}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          objectFit: 'cover',
-                          border: '1px solid var(--border)',
-                          flexShrink: 0,
-                        }}
-                      />
-                    )}
+                    <PetImage
+                      src={pet.photoUrls?.[0]}
+                      alt={pet.name}
+                      size={32}
+                    />
                     <Link to={`/pets/${pet.id}`} className="pet-name">
                       {pet.name}
                     </Link>
@@ -295,15 +287,12 @@ export const PetList: React.FC = () => {
 
                 <div className="pet-details-row">
                   <span>{pet.species}</span>
-                  {pet.birthDate && (
-                    <>
-                      <span className="meta-dot">·</span>
-                      <span>
-                        {calculateAge(pet.birthDate)}
-                        {pet.birthDateEstimated && ' (est.)'}
-                      </span>
-                    </>
-                  )}
+                  <span className="meta-dot">·</span>
+                  <span>
+                    {pet.birthDate
+                      ? `${calculateAge(pet.birthDate)}${pet.birthDateEstimated ? ' (est.)' : ''}`
+                      : 'Age unknown'}
+                  </span>
                   {pet.tags && pet.tags.length > 0 && (
                     <>
                       <span className="meta-dot">·</span>

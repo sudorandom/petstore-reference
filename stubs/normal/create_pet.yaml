@@ -10,8 +10,10 @@ stubs:
           'birth_date': req.birth_date,
           'birth_date_estimated': req.birth_date_estimated,
           'status': req.status,
-          'photos': [],
+          'photo_urls': req.photo_urls,
           'tags': req.tags,
+          'created_at': '2024-01-01T00:00:00Z',
+          'modified_at': '2024-01-01T00:00:00Z',
           'created_by': 'system',
           'modified_by': 'system'
         }

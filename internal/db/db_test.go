@@ -146,6 +146,7 @@ func (s *DBTestSuite) TestPetQueries() {
 		BirthDate:          pgtype.Date{Time: time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		BirthDateEstimated: false,
 		Status:             "PET_STATUS_AVAILABLE",
+		PhotoUrls:          []string{"https://example.com/buddy.jpg"},
 		Tags:               []string{"friendly", "trained"},
 		CreatedBy:          "test@example.com",
 		ModifiedBy:         "test@example.com",
@@ -154,13 +155,29 @@ func (s *DBTestSuite) TestPetQueries() {
 	s.Equal("Buddy", created.Name)
 	s.Equal("Dog", created.Species)
 	s.Equal("PET_STATUS_AVAILABLE", created.Status)
+	s.Equal([]string{"https://example.com/buddy.jpg"}, created.PhotoUrls)
 	s.True(created.ID.Valid)
+
+	// CreatePet with NULL birth_date
+	nullBirthPet, err := queries.CreatePet(s.ctx, db.CreatePetParams{
+		Name:       "NoBirthPet",
+		Species:    "Cat",
+		BirthDate:  pgtype.Date{Valid: false},
+		Status:     "PET_STATUS_AVAILABLE",
+		PhotoUrls:  []string{},
+		Tags:       []string{},
+		CreatedBy:  "test@example.com",
+		ModifiedBy: "test@example.com",
+	})
+	s.Require().NoError(err)
+	s.False(nullBirthPet.BirthDate.Valid)
 
 	// 2. GetPet
 	fetched, err := queries.GetPet(s.ctx, created.ID)
 	s.Require().NoError(err)
 	s.Equal(created.ID, fetched.ID)
 	s.Equal("Buddy", fetched.Name)
+	s.Equal([]string{"https://example.com/buddy.jpg"}, fetched.PhotoUrls)
 
 	// 3. CountPets & ListPets
 	count, err := queries.CountPets(s.ctx, db.CountPetsParams{
@@ -177,6 +194,7 @@ func (s *DBTestSuite) TestPetQueries() {
 	s.Require().NoError(err)
 	s.Len(pets, 1)
 	s.Equal(created.ID, pets[0].ID)
+	s.Equal([]string{"https://example.com/buddy.jpg"}, pets[0].PhotoUrls)
 
 	// 4. UpdatePet
 	updated, err := queries.UpdatePet(s.ctx, db.UpdatePetParams{
@@ -186,12 +204,14 @@ func (s *DBTestSuite) TestPetQueries() {
 		BirthDate:          created.BirthDate,
 		BirthDateEstimated: true,
 		Status:             "PET_STATUS_ADOPTED",
+		PhotoUrls:          []string{"https://example.com/buddy2.jpg"},
 		Tags:               []string{"adopted"},
 		ModifiedBy:         "admin@example.com",
 	})
 	s.Require().NoError(err)
 	s.Equal("Buddy The Best", updated.Name)
 	s.Equal("PET_STATUS_ADOPTED", updated.Status)
+	s.Equal([]string{"https://example.com/buddy2.jpg"}, updated.PhotoUrls)
 	s.True(updated.BirthDateEstimated)
 
 	// 5. TouchPet
@@ -213,62 +233,6 @@ func (s *DBTestSuite) TestPetQueries() {
 	s.Equal(int64(0), rowsAffected)
 }
 
-func (s *DBTestSuite) TestPetPhotoQueries() {
-	queries := db.New(s.testDB.Pool)
-
-	// First create a pet for foreign key
-	pet, err := queries.CreatePet(s.ctx, db.CreatePetParams{
-		Name:       "Bella",
-		Species:    "Cat",
-		BirthDate:  pgtype.Date{Time: time.Date(2023, 3, 15, 0, 0, 0, 0, time.UTC), Valid: true},
-		Status:     "PET_STATUS_AVAILABLE",
-		Tags:       []string{},
-		CreatedBy:  "test@example.com",
-		ModifiedBy: "test@example.com",
-	})
-	s.Require().NoError(err)
-
-	// 1. CreatePetPhoto
-	photoData := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}
-	createdPhoto, err := queries.CreatePetPhoto(s.ctx, db.CreatePetPhotoParams{
-		PetID:     pet.ID,
-		Data:      photoData,
-		MimeType:  "image/jpeg",
-		SizeBytes: int32(len(photoData)),
-	})
-	s.Require().NoError(err)
-	s.True(createdPhoto.ID.Valid)
-	s.Equal("image/jpeg", createdPhoto.MimeType)
-
-	// 2. GetPetPhoto
-	fetchedPhoto, err := queries.GetPetPhoto(s.ctx, createdPhoto.ID)
-	s.Require().NoError(err)
-	s.Equal(createdPhoto.ID, fetchedPhoto.ID)
-	s.Equal(photoData, fetchedPhoto.Data)
-
-	// 3. ListPetPhotos
-	photos, err := queries.ListPetPhotos(s.ctx, pet.ID)
-	s.Require().NoError(err)
-	s.Len(photos, 1)
-	s.Equal(createdPhoto.ID, photos[0].ID)
-
-	// 4. ListPhotosForPets
-	multiPhotos, err := queries.ListPhotosForPets(s.ctx, []pgtype.UUID{pet.ID})
-	s.Require().NoError(err)
-	s.Len(multiPhotos, 1)
-	s.Equal(createdPhoto.ID, multiPhotos[0].ID)
-
-	// 5. DeletePetPhoto
-	deletedPetID, err := queries.DeletePetPhoto(s.ctx, createdPhoto.ID)
-	s.Require().NoError(err)
-	s.Equal(pet.ID, deletedPetID)
-
-	// 6. Verify deleted from ListPetPhotos
-	photos, err = queries.ListPetPhotos(s.ctx, pet.ID)
-	s.Require().NoError(err)
-	s.Empty(photos)
-}
-
 func (s *DBTestSuite) TestWithTx() {
 	tx, err := s.testDB.Pool.Begin(s.ctx)
 	s.Require().NoError(err)
@@ -280,6 +244,7 @@ func (s *DBTestSuite) TestWithTx() {
 		Species:    "Hamster",
 		BirthDate:  pgtype.Date{Time: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		Status:     "PET_STATUS_AVAILABLE",
+		PhotoUrls:  []string{},
 		Tags:       []string{},
 		CreatedBy:  "tx@example.com",
 		ModifiedBy: "tx@example.com",

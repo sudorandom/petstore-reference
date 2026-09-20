@@ -2,8 +2,6 @@ package pet
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -69,6 +67,7 @@ func (s *PetHandlerTestSuite) TestCreatePet() {
 		BirthDateEstimated: true,
 		Status:             petv1.PetStatus_PET_STATUS_UNSPECIFIED, // Should default to AVAILABLE
 		Tags:               []string{"calico", "friendly"},
+		PhotoUrls:          []string{"https://example.com/luna1.jpg", "https://example.com/luna2.jpg"},
 	})
 
 	resp, err := s.handler.CreatePet(ctx, req)
@@ -83,8 +82,19 @@ func (s *PetHandlerTestSuite) TestCreatePet() {
 	s.True(pet.BirthDateEstimated)
 	s.Equal(petv1.PetStatus_PET_STATUS_AVAILABLE, pet.Status) // Defaulted
 	s.Equal([]string{"calico", "friendly"}, pet.Tags)
+	s.Equal([]string{"https://example.com/luna1.jpg", "https://example.com/luna2.jpg"}, pet.PhotoUrls)
 	s.Equal("creator@example.com", pet.CreatedBy)
 	s.Equal("creator@example.com", pet.ModifiedBy)
+
+	// Create pet without birth date (optional)
+	reqNoBirth := connect.NewRequest(&petv1.CreatePetRequest{
+		Name:    "Mochi",
+		Species: "Cat",
+	})
+	respNoBirth, err := s.handler.CreatePet(ctx, reqNoBirth)
+	s.Require().NoError(err)
+	s.Require().NotNil(respNoBirth.Msg.Pet)
+	s.Empty(respNoBirth.Msg.Pet.BirthDate)
 }
 
 func (s *PetHandlerTestSuite) TestCreatePetValidation() {
@@ -141,7 +151,11 @@ func (s *PetHandlerTestSuite) TestListPets() {
 
 	// Seed 3 pets: 2 Dogs (1 AVAILABLE, 1 ADOPTED), 1 Cat (AVAILABLE)
 	dog1Resp, err := s.handler.CreatePet(ctx, connect.NewRequest(&petv1.CreatePetRequest{
-		Name: "Dog1", Species: "Dog", BirthDate: "2020-01-01", Status: petv1.PetStatus_PET_STATUS_AVAILABLE,
+		Name:      "Dog1",
+		Species:   "Dog",
+		BirthDate: "2020-01-01",
+		Status:    petv1.PetStatus_PET_STATUS_AVAILABLE,
+		PhotoUrls: []string{"https://example.com/dog1.jpg"},
 	}))
 	s.Require().NoError(err)
 	dog1ID := dog1Resp.Msg.Pet.Id
@@ -156,15 +170,6 @@ func (s *PetHandlerTestSuite) TestListPets() {
 	}))
 	s.Require().NoError(err)
 
-	// Upload a photo for Dog1 to verify ListPets populates photos
-	jpegBytes := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}
-	_, err = s.handler.UploadPetPhoto(ctx, connect.NewRequest(&petv1.UploadPetPhotoRequest{
-		PetId:    dog1ID,
-		Data:     jpegBytes,
-		MimeType: "image/jpeg",
-	}))
-	s.Require().NoError(err)
-
 	// Filter by species "Dog"
 	dogResp, err := s.handler.ListPets(ctx, connect.NewRequest(&petv1.ListPetsRequest{
 		Species: "Dog",
@@ -172,13 +177,13 @@ func (s *PetHandlerTestSuite) TestListPets() {
 	s.Require().NoError(err)
 	s.Equal(int32(2), dogResp.Msg.TotalCount)
 	s.Len(dogResp.Msg.Pets, 2)
-	// One of the dogs should have a photo
+	// One of the dogs should have photo_urls
 	var foundPhoto bool
 	for _, p := range dogResp.Msg.Pets {
-		if len(p.Photos) > 0 {
+		if len(p.PhotoUrls) > 0 {
 			foundPhoto = true
 			s.Equal(dog1ID, p.Id)
-			s.NotEmpty(p.Photos[0].Url)
+			s.Equal([]string{"https://example.com/dog1.jpg"}, p.PhotoUrls)
 		}
 	}
 	s.True(foundPhoto)
@@ -228,10 +233,12 @@ func (s *PetHandlerTestSuite) TestUpdatePet() {
 		BirthDateEstimated: true,
 		Status:             petv1.PetStatus_PET_STATUS_ADOPTED,
 		Tags:               []string{"champion"},
+		PhotoUrls:          []string{"https://example.com/rocky.jpg"},
 	}))
 	s.Require().NoError(err)
 	s.Equal("Rocky Balboa", updateResp.Msg.Pet.Name)
 	s.Equal(petv1.PetStatus_PET_STATUS_ADOPTED, updateResp.Msg.Pet.Status)
+	s.Equal([]string{"https://example.com/rocky.jpg"}, updateResp.Msg.Pet.PhotoUrls)
 	s.Equal("updater@example.com", updateResp.Msg.Pet.ModifiedBy)
 
 	// Update non-existent pet -> CodeNotFound
@@ -266,92 +273,6 @@ func (s *PetHandlerTestSuite) TestDeletePet() {
 	_, err = s.handler.DeletePet(ctx, connect.NewRequest(&petv1.DeletePetRequest{Id: petID}))
 	s.Require().Error(err)
 	s.Equal(connect.CodeNotFound, connect.CodeOf(err))
-}
-
-func (s *PetHandlerTestSuite) TestPhotoLifecycle() {
-	ctx := s.authContext("photo_user@example.com")
-
-	// Create pet
-	createResp, err := s.handler.CreatePet(ctx, connect.NewRequest(&petv1.CreatePetRequest{
-		Name:      "Milo",
-		Species:   "Dog",
-		BirthDate: "2023-01-01",
-	}))
-	s.Require().NoError(err)
-	petID := createResp.Msg.Pet.Id
-
-	jpegBytes := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}
-
-	// 1. Reject invalid MIME type (e.g. text declared as jpeg)
-	_, err = s.handler.UploadPetPhoto(ctx, connect.NewRequest(&petv1.UploadPetPhotoRequest{
-		PetId:    petID,
-		Data:     []byte("this is plain text"),
-		MimeType: "image/jpeg",
-	}))
-	s.Require().Error(err)
-	s.Equal(connect.CodeInvalidArgument, connect.CodeOf(err))
-
-	// 2. Upload valid JPEG photo
-	uploadResp, err := s.handler.UploadPetPhoto(ctx, connect.NewRequest(&petv1.UploadPetPhotoRequest{
-		PetId:    petID,
-		Data:     jpegBytes,
-		MimeType: "image/jpeg",
-	}))
-	s.Require().NoError(err)
-	s.NotEmpty(uploadResp.Msg.PhotoId)
-	s.Contains(uploadResp.Msg.PhotoUrl, uploadResp.Msg.PhotoId)
-	s.Require().Len(uploadResp.Msg.Pet.Photos, 1)
-	s.Equal(uploadResp.Msg.PhotoId, uploadResp.Msg.Pet.Photos[0].Id)
-	s.Equal(uploadResp.Msg.PhotoUrl, uploadResp.Msg.Pet.Photos[0].Url)
-	photoID := uploadResp.Msg.PhotoId
-
-	// 3. HTTP Photo Handler (GET /photos/{id})
-	handler := NewPhotoHandler(db.New(s.testDB.Pool))
-	req := httptest.NewRequest(http.MethodGet, "/photos/"+photoID, nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	s.Equal(http.StatusOK, rec.Code)
-	s.Equal("image/jpeg", rec.Header().Get("Content-Type"))
-	s.Equal("nosniff", rec.Header().Get("X-Content-Type-Options"))
-	s.Equal("private, max-age=86400", rec.Header().Get("Cache-Control"))
-	s.Equal(jpegBytes, rec.Body.Bytes())
-
-	// 4. DeletePetPhoto RPC
-	delPhotoResp, err := s.handler.DeletePetPhoto(ctx, connect.NewRequest(&petv1.DeletePetPhotoRequest{
-		PhotoId: photoID,
-	}))
-	s.Require().NoError(err)
-	s.True(delPhotoResp.Msg.Success)
-
-	// Verify photo is gone from HTTP handler (returns 404)
-	rec404 := httptest.NewRecorder()
-	handler.ServeHTTP(rec404, httptest.NewRequest(http.MethodGet, "/photos/"+photoID, nil))
-	s.Equal(http.StatusNotFound, rec404.Code)
-
-	// Verify photo is removed from pet
-	petResp, err := s.handler.GetPet(ctx, connect.NewRequest(&petv1.GetPetRequest{Id: petID}))
-	s.Require().NoError(err)
-	s.Empty(petResp.Msg.Pet.Photos)
-
-	// Delete again -> CodeNotFound
-	_, err = s.handler.DeletePetPhoto(ctx, connect.NewRequest(&petv1.DeletePetPhotoRequest{PhotoId: photoID}))
-	s.Require().Error(err)
-	s.Equal(connect.CodeNotFound, connect.CodeOf(err))
-
-	// Handler edge cases
-	recBadUUID := httptest.NewRecorder()
-	handler.ServeHTTP(recBadUUID, httptest.NewRequest(http.MethodGet, "/photos/not-a-uuid", nil))
-	s.Equal(http.StatusBadRequest, recBadUUID.Code)
-
-	recEmptyID := httptest.NewRecorder()
-	handler.ServeHTTP(recEmptyID, httptest.NewRequest(http.MethodGet, "/photos/", nil))
-	s.Equal(http.StatusNotFound, recEmptyID.Code)
-
-	nilHandler := NewPhotoHandler(nil)
-	recNilDB := httptest.NewRecorder()
-	nilHandler.ServeHTTP(recNilDB, httptest.NewRequest(http.MethodGet, "/photos/00000000-0000-0000-0000-000000000001", nil))
-	s.Equal(http.StatusServiceUnavailable, recNilDB.Code)
 }
 
 func TestPetHandlerTestSuite(t *testing.T) {
@@ -389,7 +310,7 @@ func TestToProtoPetStatusNormalization(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.input, func(t *testing.T) {
-			pet := toProtoPet(db.Pet{Status: tc.input}, nil)
+			pet := toProtoPet(db.Pet{Status: tc.input})
 			assert.Equal(t, tc.expected, pet.Status)
 		})
 	}
@@ -401,17 +322,14 @@ func TestParseDate(t *testing.T) {
 	assert.True(t, d.Valid)
 	assert.Equal(t, "2023-05-10", d.Time.Format("2006-01-02"))
 
+	emptyD, err := parseDate("")
+	require.NoError(t, err)
+	assert.False(t, emptyD.Valid)
+
+	blankD, err := parseDate("   ")
+	require.NoError(t, err)
+	assert.False(t, blankD.Valid)
+
 	_, err = parseDate("invalid-date")
 	require.Error(t, err)
-}
-
-func TestIsValidImageMime(t *testing.T) {
-	assert.True(t, isValidImageMime("image/jpeg", "image/jpeg"))
-	assert.True(t, isValidImageMime("image/png", "image/png"))
-	assert.True(t, isValidImageMime("image/gif", "image/gif"))
-	assert.True(t, isValidImageMime("image/webp", "image/webp"))
-	assert.False(t, isValidImageMime("application/octet-stream", "image/webp"))
-
-	assert.False(t, isValidImageMime("text/html", "image/png"))
-	assert.False(t, isValidImageMime("image/png", "image/jpeg"))
 }

@@ -135,24 +135,24 @@ just fauxrpc
 # Run with failure stubs (simulating errors across all RPC methods)
 just fauxrpc-fail
 ```
-- **Mock Documentation:** `https://127.0.0.1:6660/fauxrpc/docs/`
-FauxRPC will be available over HTTPS at `https://127.0.0.1:6660` with built-in documentation at `/fauxrpc/docs/`.
+- **Mock Documentation:** `https://127.0.0.1:8080/fauxrpc/docs/`
+FauxRPC will be available over HTTPS at `https://127.0.0.1:8080` with built-in documentation at `/fauxrpc/docs/`.
 
 ### 8. Testing the Frontend with FauxRPC
 You can test the frontend against FauxRPC both interactively in the browser and via automated tests:
 
 #### Interactive Development / Manual Testing
-1. In one terminal, start the FauxRPC mock server:
+1. In one terminal, start the FauxRPC mock server (listening on `:8080`, the same port as the Go server):
    ```bash
    just fauxrpc
    # or test failure states:
    just fauxrpc-fail
    ```
-2. In another terminal, start the web dev server configured for mock mode:
+2. In another terminal, start the web dev server:
    ```bash
-   just web-mock
+   just web-dev
    ```
-   The frontend at `https://localhost:4321` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
+   The frontend at `https://localhost:4321` proxies all requests to `https://localhost:8080` (FauxRPC).
 
 #### Automated Frontend Tests
 Run the Vitest test suite, which automatically spawns ephemeral FauxRPC mock servers and verifies frontend pages, components, and error states:

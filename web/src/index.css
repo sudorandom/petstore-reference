@@ -5,6 +5,7 @@
 /* Dark Mode (Default) */
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-primary: #121214;
   --bg-secondary: #18181b;
   --bg-tertiary: #27272a;
@@ -28,6 +29,7 @@
 
 /* Light Mode */
 [data-theme="light"] {
+  color-scheme: light;
   --bg-primary: #ffffff;
   --bg-secondary: #f4f4f5;
   --bg-tertiary: #e4e4e7;
@@ -75,13 +77,17 @@
   padding: 0;
 }
 
+html {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
   padding: 2rem 1rem;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .container {

@@ -16,7 +16,6 @@ import (
 	"connectrpc.com/validate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/cors"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/example/pets/gen/go/pet/v1/petv1connect"
 	"github.com/example/pets/internal/auth"
@@ -162,7 +161,6 @@ func main() {
 }
 
 func newServerHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, error) {
-	queries := db.New(pool)
 	petHandler := pet.NewHandler(pool)
 
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
@@ -229,8 +227,6 @@ func newServerHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, err
 		_, _ = w.Write([]byte(`{"status":"unavailable","database":"disconnected"}`))
 	})
 
-	photoHandler := otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos")
-	mux.Handle("GET /photos/{id}", auth.Middleware(authCfg)(photoHandler))
 
 	var rootHandler http.Handler = mux
 

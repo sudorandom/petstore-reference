@@ -14,6 +14,8 @@ export const ThemeSwitcher: React.FC = () => {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.style.colorScheme = theme;
+    document.documentElement.style.backgroundColor = theme === 'light' ? '#ffffff' : '#121214';
     localStorage.setItem('theme', theme);
   }, [theme]);
 

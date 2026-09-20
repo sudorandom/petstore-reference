@@ -1,8 +1,8 @@
 -- name: CreatePet :one
 INSERT INTO pets (
-    name, species, birth_date, birth_date_estimated, status, tags, created_at, modified_at, created_by, modified_by
+    name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8
+    $1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8, $9
 )
 RETURNING *;
 
@@ -30,9 +30,10 @@ SET
     birth_date = $4,
     birth_date_estimated = $5,
     status = $6,
-    tags = $7,
+    photo_urls = $7,
+    tags = $8,
     modified_at = NOW(),
-    modified_by = $8
+    modified_by = $9
 WHERE id = $1
 RETURNING *;
 

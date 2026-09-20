@@ -20,13 +20,5 @@ type Pet struct {
 	ModifiedAt         pgtype.Timestamptz `json:"modified_at"`
 	CreatedBy          string             `json:"created_by"`
 	ModifiedBy         string             `json:"modified_by"`
-}
-
-type PetPhoto struct {
-	ID        pgtype.UUID        `json:"id"`
-	PetID     pgtype.UUID        `json:"pet_id"`
-	Data      []byte             `json:"data"`
-	MimeType  string             `json:"mime_type"`
-	SizeBytes int32              `json:"size_bytes"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	PhotoUrls          []string           `json:"photo_urls"`
 }

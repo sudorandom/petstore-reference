@@ -115,7 +115,7 @@ describe('Frontend tests with FauxRPC mock server', () => {
       () => {
         expect(screen.getByRole('heading', { name: 'Pet Information' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Audit & Identity' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Upload Photo/i })).toBeInTheDocument();
+        expect(screen.getByText('Photos')).toBeInTheDocument();
       },
       { timeout: 8000 }
     );

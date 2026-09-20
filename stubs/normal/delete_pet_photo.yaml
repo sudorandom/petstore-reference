@@ -1,7 +1,0 @@
-stubs:
-  - id: delete-pet-photo
-    target: pet.v1.PetService/DeletePetPhoto
-    cel_content: |
-      {
-        'success': true
-      }

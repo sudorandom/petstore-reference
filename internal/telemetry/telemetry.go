@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -65,7 +66,8 @@ func LoadConfigFromEnv(configPath ...string) Config {
 	}
 
 	if targetPath != "" {
-		if _, err := os.Stat(targetPath); err == nil {
+		targetPath = filepath.Clean(targetPath)
+		if _, err := os.Stat(targetPath); err == nil { //nolint:gosec // targetPath is from CLI flag or env var
 			if err := cleanenv.ReadConfig(targetPath, &cfg); err != nil {
 				slog.Warn("Failed to read telemetry config file, falling back to environment variables",
 					"path", targetPath,

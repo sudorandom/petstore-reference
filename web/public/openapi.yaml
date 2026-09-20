@@ -87,45 +87,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/pet.v1.DeletePetResponse'
-  /pet.v1.PetService/DeletePetPhoto:
-    post:
-      tags:
-        - pet.v1.PetService
-      summary: DeletePetPhoto
-      operationId: pet.v1.PetService.DeletePetPhoto
-      parameters:
-        - name: Connect-Protocol-Version
-          in: header
-          description: Define the version of the Connect protocol
-          required: true
-          schema:
-            $ref: '#/components/schemas/connect-protocol-version'
-          example: 1
-        - name: Connect-Timeout-Ms
-          in: header
-          description: Define the timeout, in ms
-          schema:
-            $ref: '#/components/schemas/connect-timeout-header'
-          example: 1000
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/pet.v1.DeletePetPhotoRequest'
-        required: true
-      responses:
-        default:
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/connect.error'
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/pet.v1.DeletePetPhotoResponse'
   /pet.v1.PetService/GetPet:
     post:
       tags:
@@ -243,45 +204,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/pet.v1.UpdatePetResponse'
-  /pet.v1.PetService/UploadPetPhoto:
-    post:
-      tags:
-        - pet.v1.PetService
-      summary: UploadPetPhoto
-      operationId: pet.v1.PetService.UploadPetPhoto
-      parameters:
-        - name: Connect-Protocol-Version
-          in: header
-          description: Define the version of the Connect protocol
-          required: true
-          schema:
-            $ref: '#/components/schemas/connect-protocol-version'
-          example: 1
-        - name: Connect-Timeout-Ms
-          in: header
-          description: Define the timeout, in ms
-          schema:
-            $ref: '#/components/schemas/connect-timeout-header'
-          example: 1000
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/pet.v1.UploadPetPhotoRequest'
-        required: true
-      responses:
-        default:
-          description: Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/connect.error'
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/pet.v1.UploadPetPhotoResponse'
 components:
   schemas:
     connect-protocol-version:
@@ -373,11 +295,17 @@ components:
         birthDate:
           type: string
           title: birth_date
-          pattern: ^\d{4}-\d{2}-\d{2}$
+          pattern: ^(\d{4}-\d{2}-\d{2})?$
         status:
           allOf:
             - $ref: '#/components/schemas/pet.v1.PetStatus'
           title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          title: photo_urls
         tags:
           type: array
           items:
@@ -396,23 +324,6 @@ components:
             - $ref: '#/components/schemas/pet.v1.Pet'
           title: pet
       title: CreatePetResponse
-      additionalProperties: false
-    pet.v1.DeletePetPhotoRequest:
-      type: object
-      properties:
-        photoId:
-          type: string
-          title: photo_id
-          format: uuid
-      title: DeletePetPhotoRequest
-      additionalProperties: false
-    pet.v1.DeletePetPhotoResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          title: success
-      title: DeletePetPhotoResponse
       additionalProperties: false
     pet.v1.DeletePetRequest:
       type: object
@@ -510,11 +421,17 @@ components:
         birthDate:
           type: string
           title: birth_date
-          pattern: ^\d{4}-\d{2}-\d{2}$
+          pattern: ^(\d{4}-\d{2}-\d{2})?$
         status:
           allOf:
             - $ref: '#/components/schemas/pet.v1.PetStatus'
           title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          title: photo_urls
         tags:
           type: array
           items:
@@ -537,35 +454,7 @@ components:
         birthDateEstimated:
           type: boolean
           title: birth_date_estimated
-        photos:
-          type: array
-          items:
-            $ref: '#/components/schemas/pet.v1.PetPhoto'
-          title: photos
       title: Pet
-      additionalProperties: false
-    pet.v1.PetPhoto:
-      type: object
-      properties:
-        id:
-          type: string
-          title: id
-          format: uuid
-        url:
-          type: string
-          title: url
-        mimeType:
-          type: string
-          title: mime_type
-        sizeBytes:
-          type: integer
-          title: size_bytes
-          format: int32
-        createdAt:
-          allOf:
-            - $ref: '#/components/schemas/google.protobuf.Timestamp'
-          title: created_at
-      title: PetPhoto
       additionalProperties: false
     pet.v1.PetStatus:
       type: string
@@ -595,11 +484,17 @@ components:
         birthDate:
           type: string
           title: birth_date
-          pattern: ^\d{4}-\d{2}-\d{2}$
+          pattern: ^(\d{4}-\d{2}-\d{2})?$
         status:
           allOf:
             - $ref: '#/components/schemas/pet.v1.PetStatus'
           title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          title: photo_urls
         tags:
           type: array
           items:
@@ -618,46 +513,6 @@ components:
             - $ref: '#/components/schemas/pet.v1.Pet'
           title: pet
       title: UpdatePetResponse
-      additionalProperties: false
-    pet.v1.UploadPetPhotoRequest:
-      type: object
-      properties:
-        petId:
-          type: string
-          title: pet_id
-          format: uuid
-        data:
-          type: string
-          title: data
-          maxLength: 5242880
-          minLength: 1
-          format: byte
-          description: Photo binary data (up to 5MB)
-        mimeType:
-          type: string
-          title: mime_type
-          enum:
-            - image/jpeg
-            - image/png
-            - image/webp
-            - image/gif
-          description: Allowed image MIME types
-      title: UploadPetPhotoRequest
-      additionalProperties: false
-    pet.v1.UploadPetPhotoResponse:
-      type: object
-      properties:
-        photoId:
-          type: string
-          title: photo_id
-        photoUrl:
-          type: string
-          title: photo_url
-        pet:
-          allOf:
-            - $ref: '#/components/schemas/pet.v1.Pet'
-          title: pet
-      title: UploadPetPhotoResponse
       additionalProperties: false
 security: []
 tags:

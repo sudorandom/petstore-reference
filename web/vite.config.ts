@@ -11,10 +11,7 @@ const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const isMock = env.VITE_MOCK === 'true' || mode === 'mock';
-  const defaultTarget = isMock
-    ? (hasCerts ? 'https://127.0.0.1:6660' : 'http://127.0.0.1:6660')
-    : (hasCerts ? 'https://localhost:8080' : 'http://localhost:8080');
+  const defaultTarget = hasCerts ? 'https://127.0.0.1:8080' : 'http://127.0.0.1:8080';
   const backendTarget = env.VITE_BACKEND_TARGET || defaultTarget;
 
   return {
@@ -23,11 +20,6 @@ export default defineConfig(({ mode }) => {
       port: 4321,
       proxy: {
         '/pet.v1.PetService': {
-          target: backendTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        '/photos': {
           target: backendTarget,
           changeOrigin: true,
           secure: false,

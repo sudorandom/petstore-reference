@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file pet/v1/pet.proto.
  */
 export const file_pet_v1_pet: GenFile = /*@__PURE__*/
-  fileDesc("ChBwZXQvdjEvcGV0LnByb3RvEgZwZXQudjEiiwMKA1BldBIUCgJpZBgBIAEoCUIIukgFcgOwAQESFwoEbmFtZRgCIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAyABKAlCCbpIBnIEEAEYMhIuCgpiaXJ0aF9kYXRlGAQgASgJQhq6SBdyFTITXlxkezR9LVxkezJ9LVxkezJ9JBIrCgZzdGF0dXMYBSABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARIMCgR0YWdzGAcgAygJEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC21vZGlmaWVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjcmVhdGVkX2J5GAogASgJEhMKC21vZGlmaWVkX2J5GAsgASgJEhwKFGJpcnRoX2RhdGVfZXN0aW1hdGVkGAwgASgIEiAKBnBob3RvcxgNIAMoCzIQLnBldC52MS5QZXRQaG90b0oECAYQByKEAQoIUGV0UGhvdG8SFAoCaWQYASABKAlCCLpIBXIDsAEBEgsKA3VybBgCIAEoCRIRCgltaW1lX3R5cGUYAyABKAkSEgoKc2l6ZV9ieXRlcxgEIAEoBRIuCgpjcmVhdGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLWAQoQQ3JlYXRlUGV0UmVxdWVzdBIXCgRuYW1lGAEgASgJQgm6SAZyBBABGGQSGgoHc3BlY2llcxgCIAEoCUIJukgGcgQQARgyEi4KCmJpcnRoX2RhdGUYAyABKAlCGrpIF3IVMhNeXGR7NH0tXGR7Mn0tXGR7Mn0kEisKBnN0YXR1cxgEIAEoDjIRLnBldC52MS5QZXRTdGF0dXNCCLpIBYIBAhABEgwKBHRhZ3MYBiADKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYByABKAhKBAgFEAYiLQoRQ3JlYXRlUGV0UmVzcG9uc2USGAoDcGV0GAEgASgLMgsucGV0LnYxLlBldCIlCg1HZXRQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIqCg5HZXRQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0InoKD0xpc3RQZXRzUmVxdWVzdBIhCgZzdGF0dXMYASABKA4yES5wZXQudjEuUGV0U3RhdHVzEg8KB3NwZWNpZXMYAiABKAkSHAoJcGFnZV9zaXplGAMgASgFQgm6SAYaBBhkKAASFQoEcGFnZRgEIAEoBUIHukgEGgIoACJCChBMaXN0UGV0c1Jlc3BvbnNlEhkKBHBldHMYASADKAsyCy5wZXQudjEuUGV0EhMKC3RvdGFsX2NvdW50GAIgASgFIuwBChBVcGRhdGVQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIXCgRuYW1lGAIgASgJQgm6SAZyBBABGGQSGgoHc3BlY2llcxgDIAEoCUIJukgGcgQQARgyEi4KCmJpcnRoX2RhdGUYBCABKAlCGrpIF3IVMhNeXGR7NH0tXGR7Mn0tXGR7Mn0kEisKBnN0YXR1cxgFIAEoDjIRLnBldC52MS5QZXRTdGF0dXNCCLpIBYIBAhABEgwKBHRhZ3MYByADKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYCCABKAhKBAgGEAciLQoRVXBkYXRlUGV0UmVzcG9uc2USGAoDcGV0GAEgASgLMgsucGV0LnYxLlBldCIoChBEZWxldGVQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIkChFEZWxldGVQZXRSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIIpUBChVVcGxvYWRQZXRQaG90b1JlcXVlc3QSGAoGcGV0X2lkGAEgASgJQgi6SAVyA7ABARIaCgRkYXRhGAIgASgMQgy6SAl6BxABGICAwAISRgoJbWltZV90eXBlGAMgASgJQjO6SDByLlIKaW1hZ2UvanBlZ1IJaW1hZ2UvcG5nUgppbWFnZS93ZWJwUglpbWFnZS9naWYiVwoWVXBsb2FkUGV0UGhvdG9SZXNwb25zZRIQCghwaG90b19pZBgBIAEoCRIRCglwaG90b191cmwYAiABKAkSGAoDcGV0GAMgASgLMgsucGV0LnYxLlBldCIzChVEZWxldGVQZXRQaG90b1JlcXVlc3QSGgoIcGhvdG9faWQYASABKAlCCLpIBXIDsAEBIikKFkRlbGV0ZVBldFBob3RvUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCCpxCglQZXRTdGF0dXMSGgoWUEVUX1NUQVRVU19VTlNQRUNJRklFRBAAEhgKFFBFVF9TVEFUVVNfQVZBSUxBQkxFEAESFgoSUEVUX1NUQVRVU19QRU5ESU5HEAISFgoSUEVUX1NUQVRVU19BRE9QVEVEEAMy7AMKClBldFNlcnZpY2USQAoJQ3JlYXRlUGV0EhgucGV0LnYxLkNyZWF0ZVBldFJlcXVlc3QaGS5wZXQudjEuQ3JlYXRlUGV0UmVzcG9uc2USNwoGR2V0UGV0EhUucGV0LnYxLkdldFBldFJlcXVlc3QaFi5wZXQudjEuR2V0UGV0UmVzcG9uc2USPQoITGlzdFBldHMSFy5wZXQudjEuTGlzdFBldHNSZXF1ZXN0GhgucGV0LnYxLkxpc3RQZXRzUmVzcG9uc2USQAoJVXBkYXRlUGV0EhgucGV0LnYxLlVwZGF0ZVBldFJlcXVlc3QaGS5wZXQudjEuVXBkYXRlUGV0UmVzcG9uc2USQAoJRGVsZXRlUGV0EhgucGV0LnYxLkRlbGV0ZVBldFJlcXVlc3QaGS5wZXQudjEuRGVsZXRlUGV0UmVzcG9uc2USTwoOVXBsb2FkUGV0UGhvdG8SHS5wZXQudjEuVXBsb2FkUGV0UGhvdG9SZXF1ZXN0Gh4ucGV0LnYxLlVwbG9hZFBldFBob3RvUmVzcG9uc2USTwoORGVsZXRlUGV0UGhvdG8SHS5wZXQudjEuRGVsZXRlUGV0UGhvdG9SZXF1ZXN0Gh4ucGV0LnYxLkRlbGV0ZVBldFBob3RvUmVzcG9uc2VCLVorZ2l0aHViLmNvbS9leGFtcGxlL3BldHMvZ2VuL2dvL3BldC92MTtwZXR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("ChBwZXQvdjEvcGV0LnByb3RvEgZwZXQudjEiiQMKA1BldBIUCgJpZBgBIAEoCUIIukgFcgOwAQESFwoEbmFtZRgCIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAyABKAlCCbpIBnIEEAEYMhIxCgpiaXJ0aF9kYXRlGAQgASgJQh26SBpyGDIWXihcZHs0fS1cZHsyfS1cZHsyfSk/JBIrCgZzdGF0dXMYBSABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARIhCgpwaG90b191cmxzGAYgAygJQg26SAqSAQciBXIDiAEBEgwKBHRhZ3MYByADKAkSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLbW9kaWZpZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmNyZWF0ZWRfYnkYCiABKAkSEwoLbW9kaWZpZWRfYnkYCyABKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYDCABKAgi9gEKEENyZWF0ZVBldFJlcXVlc3QSFwoEbmFtZRgBIAEoCUIJukgGcgQQARhkEhoKB3NwZWNpZXMYAiABKAlCCbpIBnIEEAEYMhIxCgpiaXJ0aF9kYXRlGAMgASgJQh26SBpyGDIWXihcZHs0fS1cZHsyfS1cZHsyfSk/JBIrCgZzdGF0dXMYBCABKA4yES5wZXQudjEuUGV0U3RhdHVzQgi6SAWCAQIQARIhCgpwaG90b191cmxzGAUgAygJQg26SAqSAQciBXIDiAEBEgwKBHRhZ3MYBiADKAkSHAoUYmlydGhfZGF0ZV9lc3RpbWF0ZWQYByABKAgiLQoRQ3JlYXRlUGV0UmVzcG9uc2USGAoDcGV0GAEgASgLMgsucGV0LnYxLlBldCIlCg1HZXRQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIqCg5HZXRQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0InoKD0xpc3RQZXRzUmVxdWVzdBIhCgZzdGF0dXMYASABKA4yES5wZXQudjEuUGV0U3RhdHVzEg8KB3NwZWNpZXMYAiABKAkSHAoJcGFnZV9zaXplGAMgASgFQgm6SAYaBBhkKAASFQoEcGFnZRgEIAEoBUIHukgEGgIoACJCChBMaXN0UGV0c1Jlc3BvbnNlEhkKBHBldHMYASADKAsyCy5wZXQudjEuUGV0EhMKC3RvdGFsX2NvdW50GAIgASgFIowCChBVcGRhdGVQZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIXCgRuYW1lGAIgASgJQgm6SAZyBBABGGQSGgoHc3BlY2llcxgDIAEoCUIJukgGcgQQARgyEjEKCmJpcnRoX2RhdGUYBCABKAlCHbpIGnIYMhZeKFxkezR9LVxkezJ9LVxkezJ9KT8kEisKBnN0YXR1cxgFIAEoDjIRLnBldC52MS5QZXRTdGF0dXNCCLpIBYIBAhABEiEKCnBob3RvX3VybHMYBiADKAlCDbpICpIBByIFcgOIAQESDAoEdGFncxgHIAMoCRIcChRiaXJ0aF9kYXRlX2VzdGltYXRlZBgIIAEoCCItChFVcGRhdGVQZXRSZXNwb25zZRIYCgNwZXQYASABKAsyCy5wZXQudjEuUGV0IigKEERlbGV0ZVBldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKEURlbGV0ZVBldFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgqcQoJUGV0U3RhdHVzEhoKFlBFVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIYChRQRVRfU1RBVFVTX0FWQUlMQUJMRRABEhYKElBFVF9TVEFUVVNfUEVORElORxACEhYKElBFVF9TVEFUVVNfQURPUFRFRBADMsoCCgpQZXRTZXJ2aWNlEkAKCUNyZWF0ZVBldBIYLnBldC52MS5DcmVhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLkNyZWF0ZVBldFJlc3BvbnNlEjcKBkdldFBldBIVLnBldC52MS5HZXRQZXRSZXF1ZXN0GhYucGV0LnYxLkdldFBldFJlc3BvbnNlEj0KCExpc3RQZXRzEhcucGV0LnYxLkxpc3RQZXRzUmVxdWVzdBoYLnBldC52MS5MaXN0UGV0c1Jlc3BvbnNlEkAKCVVwZGF0ZVBldBIYLnBldC52MS5VcGRhdGVQZXRSZXF1ZXN0GhkucGV0LnYxLlVwZGF0ZVBldFJlc3BvbnNlEkAKCURlbGV0ZVBldBIYLnBldC52MS5EZWxldGVQZXRSZXF1ZXN0GhkucGV0LnYxLkRlbGV0ZVBldFJlc3BvbnNlQi1aK2dpdGh1Yi5jb20vZXhhbXBsZS9wZXRzL2dlbi9nby9wZXQvdjE7cGV0djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message pet.v1.Pet
@@ -45,6 +45,11 @@ export type Pet = Message<"pet.v1.Pet"> & {
   status: PetStatus;
 
   /**
+   * @generated from field: repeated string photo_urls = 6;
+   */
+  photoUrls: string[];
+
+  /**
    * @generated from field: repeated string tags = 7;
    */
   tags: string[];
@@ -73,11 +78,6 @@ export type Pet = Message<"pet.v1.Pet"> & {
    * @generated from field: bool birth_date_estimated = 12;
    */
   birthDateEstimated: boolean;
-
-  /**
-   * @generated from field: repeated pet.v1.PetPhoto photos = 13;
-   */
-  photos: PetPhoto[];
 };
 
 /**
@@ -86,43 +86,6 @@ export type Pet = Message<"pet.v1.Pet"> & {
  */
 export const PetSchema: GenMessage<Pet> = /*@__PURE__*/
   messageDesc(file_pet_v1_pet, 0);
-
-/**
- * @generated from message pet.v1.PetPhoto
- */
-export type PetPhoto = Message<"pet.v1.PetPhoto"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: string url = 2;
-   */
-  url: string;
-
-  /**
-   * @generated from field: string mime_type = 3;
-   */
-  mimeType: string;
-
-  /**
-   * @generated from field: int32 size_bytes = 4;
-   */
-  sizeBytes: number;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 5;
-   */
-  createdAt?: Timestamp;
-};
-
-/**
- * Describes the message pet.v1.PetPhoto.
- * Use `create(PetPhotoSchema)` to create a new message.
- */
-export const PetPhotoSchema: GenMessage<PetPhoto> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 1);
 
 /**
  * @generated from message pet.v1.CreatePetRequest
@@ -149,6 +112,11 @@ export type CreatePetRequest = Message<"pet.v1.CreatePetRequest"> & {
   status: PetStatus;
 
   /**
+   * @generated from field: repeated string photo_urls = 5;
+   */
+  photoUrls: string[];
+
+  /**
    * @generated from field: repeated string tags = 6;
    */
   tags: string[];
@@ -164,7 +132,7 @@ export type CreatePetRequest = Message<"pet.v1.CreatePetRequest"> & {
  * Use `create(CreatePetRequestSchema)` to create a new message.
  */
 export const CreatePetRequestSchema: GenMessage<CreatePetRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 2);
+  messageDesc(file_pet_v1_pet, 1);
 
 /**
  * @generated from message pet.v1.CreatePetResponse
@@ -181,7 +149,7 @@ export type CreatePetResponse = Message<"pet.v1.CreatePetResponse"> & {
  * Use `create(CreatePetResponseSchema)` to create a new message.
  */
 export const CreatePetResponseSchema: GenMessage<CreatePetResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 3);
+  messageDesc(file_pet_v1_pet, 2);
 
 /**
  * @generated from message pet.v1.GetPetRequest
@@ -198,7 +166,7 @@ export type GetPetRequest = Message<"pet.v1.GetPetRequest"> & {
  * Use `create(GetPetRequestSchema)` to create a new message.
  */
 export const GetPetRequestSchema: GenMessage<GetPetRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 4);
+  messageDesc(file_pet_v1_pet, 3);
 
 /**
  * @generated from message pet.v1.GetPetResponse
@@ -215,7 +183,7 @@ export type GetPetResponse = Message<"pet.v1.GetPetResponse"> & {
  * Use `create(GetPetResponseSchema)` to create a new message.
  */
 export const GetPetResponseSchema: GenMessage<GetPetResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 5);
+  messageDesc(file_pet_v1_pet, 4);
 
 /**
  * @generated from message pet.v1.ListPetsRequest
@@ -255,7 +223,7 @@ export type ListPetsRequest = Message<"pet.v1.ListPetsRequest"> & {
  * Use `create(ListPetsRequestSchema)` to create a new message.
  */
 export const ListPetsRequestSchema: GenMessage<ListPetsRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 6);
+  messageDesc(file_pet_v1_pet, 5);
 
 /**
  * @generated from message pet.v1.ListPetsResponse
@@ -277,7 +245,7 @@ export type ListPetsResponse = Message<"pet.v1.ListPetsResponse"> & {
  * Use `create(ListPetsResponseSchema)` to create a new message.
  */
 export const ListPetsResponseSchema: GenMessage<ListPetsResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 7);
+  messageDesc(file_pet_v1_pet, 6);
 
 /**
  * @generated from message pet.v1.UpdatePetRequest
@@ -309,6 +277,11 @@ export type UpdatePetRequest = Message<"pet.v1.UpdatePetRequest"> & {
   status: PetStatus;
 
   /**
+   * @generated from field: repeated string photo_urls = 6;
+   */
+  photoUrls: string[];
+
+  /**
    * @generated from field: repeated string tags = 7;
    */
   tags: string[];
@@ -324,7 +297,7 @@ export type UpdatePetRequest = Message<"pet.v1.UpdatePetRequest"> & {
  * Use `create(UpdatePetRequestSchema)` to create a new message.
  */
 export const UpdatePetRequestSchema: GenMessage<UpdatePetRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 8);
+  messageDesc(file_pet_v1_pet, 7);
 
 /**
  * @generated from message pet.v1.UpdatePetResponse
@@ -341,7 +314,7 @@ export type UpdatePetResponse = Message<"pet.v1.UpdatePetResponse"> & {
  * Use `create(UpdatePetResponseSchema)` to create a new message.
  */
 export const UpdatePetResponseSchema: GenMessage<UpdatePetResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 9);
+  messageDesc(file_pet_v1_pet, 8);
 
 /**
  * @generated from message pet.v1.DeletePetRequest
@@ -358,7 +331,7 @@ export type DeletePetRequest = Message<"pet.v1.DeletePetRequest"> & {
  * Use `create(DeletePetRequestSchema)` to create a new message.
  */
 export const DeletePetRequestSchema: GenMessage<DeletePetRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 10);
+  messageDesc(file_pet_v1_pet, 9);
 
 /**
  * @generated from message pet.v1.DeletePetResponse
@@ -375,99 +348,7 @@ export type DeletePetResponse = Message<"pet.v1.DeletePetResponse"> & {
  * Use `create(DeletePetResponseSchema)` to create a new message.
  */
 export const DeletePetResponseSchema: GenMessage<DeletePetResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 11);
-
-/**
- * @generated from message pet.v1.UploadPetPhotoRequest
- */
-export type UploadPetPhotoRequest = Message<"pet.v1.UploadPetPhotoRequest"> & {
-  /**
-   * @generated from field: string pet_id = 1;
-   */
-  petId: string;
-
-  /**
-   * Photo binary data (up to 5MB)
-   *
-   * @generated from field: bytes data = 2;
-   */
-  data: Uint8Array;
-
-  /**
-   * Allowed image MIME types
-   *
-   * @generated from field: string mime_type = 3;
-   */
-  mimeType: string;
-};
-
-/**
- * Describes the message pet.v1.UploadPetPhotoRequest.
- * Use `create(UploadPetPhotoRequestSchema)` to create a new message.
- */
-export const UploadPetPhotoRequestSchema: GenMessage<UploadPetPhotoRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 12);
-
-/**
- * @generated from message pet.v1.UploadPetPhotoResponse
- */
-export type UploadPetPhotoResponse = Message<"pet.v1.UploadPetPhotoResponse"> & {
-  /**
-   * @generated from field: string photo_id = 1;
-   */
-  photoId: string;
-
-  /**
-   * @generated from field: string photo_url = 2;
-   */
-  photoUrl: string;
-
-  /**
-   * @generated from field: pet.v1.Pet pet = 3;
-   */
-  pet?: Pet;
-};
-
-/**
- * Describes the message pet.v1.UploadPetPhotoResponse.
- * Use `create(UploadPetPhotoResponseSchema)` to create a new message.
- */
-export const UploadPetPhotoResponseSchema: GenMessage<UploadPetPhotoResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 13);
-
-/**
- * @generated from message pet.v1.DeletePetPhotoRequest
- */
-export type DeletePetPhotoRequest = Message<"pet.v1.DeletePetPhotoRequest"> & {
-  /**
-   * @generated from field: string photo_id = 1;
-   */
-  photoId: string;
-};
-
-/**
- * Describes the message pet.v1.DeletePetPhotoRequest.
- * Use `create(DeletePetPhotoRequestSchema)` to create a new message.
- */
-export const DeletePetPhotoRequestSchema: GenMessage<DeletePetPhotoRequest> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 14);
-
-/**
- * @generated from message pet.v1.DeletePetPhotoResponse
- */
-export type DeletePetPhotoResponse = Message<"pet.v1.DeletePetPhotoResponse"> & {
-  /**
-   * @generated from field: bool success = 1;
-   */
-  success: boolean;
-};
-
-/**
- * Describes the message pet.v1.DeletePetPhotoResponse.
- * Use `create(DeletePetPhotoResponseSchema)` to create a new message.
- */
-export const DeletePetPhotoResponseSchema: GenMessage<DeletePetPhotoResponse> = /*@__PURE__*/
-  messageDesc(file_pet_v1_pet, 15);
+  messageDesc(file_pet_v1_pet, 10);
 
 /**
  * @generated from enum pet.v1.PetStatus
@@ -543,22 +424,6 @@ export const PetService: GenService<{
     methodKind: "unary";
     input: typeof DeletePetRequestSchema;
     output: typeof DeletePetResponseSchema;
-  },
-  /**
-   * @generated from rpc pet.v1.PetService.UploadPetPhoto
-   */
-  uploadPetPhoto: {
-    methodKind: "unary";
-    input: typeof UploadPetPhotoRequestSchema;
-    output: typeof UploadPetPhotoResponseSchema;
-  },
-  /**
-   * @generated from rpc pet.v1.PetService.DeletePetPhoto
-   */
-  deletePetPhoto: {
-    methodKind: "unary";
-    input: typeof DeletePetPhotoRequestSchema;
-    output: typeof DeletePetPhotoResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_pet_v1_pet, 0);

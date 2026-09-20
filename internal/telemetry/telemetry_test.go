@@ -31,7 +31,7 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	cfg := LoadConfigFromEnv()
 	assert.Equal(t, "pets-service", cfg.ServiceName)
 	assert.Equal(t, "none", cfg.ExporterType)
-	assert.Equal(t, 100.0, cfg.SamplePercentage)
+	assert.InDelta(t, 100.0, cfg.SamplePercentage, 0.001)
 
 	// Test custom env
 	_ = os.Setenv("OTEL_SERVICE_NAME", "custom-petstore")
@@ -47,18 +47,18 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	cfg = LoadConfigFromEnv()
 	assert.Equal(t, "custom-petstore", cfg.ServiceName)
 	assert.Equal(t, "otlp", cfg.ExporterType)
-	assert.Equal(t, 25.0, cfg.SamplePercentage)
+	assert.InDelta(t, 25.0, cfg.SamplePercentage, 0.001)
 
 	// Test OTEL_SAMPLE_PERCENTAGE=0
 	_ = os.Setenv("OTEL_SAMPLE_PERCENTAGE", "0")
 	cfg = LoadConfigFromEnv()
-	assert.Equal(t, 0.0, cfg.SamplePercentage)
+	assert.InDelta(t, 0.0, cfg.SamplePercentage, 0.001)
 
 	// Test OTEL_TRACES_SAMPLER_ARG=0.5 ratio
 	os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
 	_ = os.Setenv("OTEL_TRACES_SAMPLER_ARG", "0.5")
 	cfg = LoadConfigFromEnv()
-	assert.Equal(t, 50.0, cfg.SamplePercentage)
+	assert.InDelta(t, 50.0, cfg.SamplePercentage, 0.001)
 }
 
 func TestLoadConfig_FromConfigFile(t *testing.T) {
@@ -80,14 +80,14 @@ insecure: false
 	assert.Equal(t, "2.1.0", cfg.ServiceVersion)
 	assert.Equal(t, "stdout", cfg.ExporterType)
 	assert.False(t, cfg.Insecure)
-	assert.Equal(t, 45.5, cfg.SamplePercentage)
+	assert.InDelta(t, 45.5, cfg.SamplePercentage, 0.001)
 
 	// 2. Override config file with environment variable
 	t.Setenv("OTEL_SERVICE_NAME", "env-override-service")
 	t.Setenv("OTEL_SAMPLE_PERCENTAGE", "75")
 	cfgOverridden := LoadConfigFromEnv(yamlFile)
 	assert.Equal(t, "env-override-service", cfgOverridden.ServiceName)
-	assert.Equal(t, 75.0, cfgOverridden.SamplePercentage)
+	assert.InDelta(t, 75.0, cfgOverridden.SamplePercentage, 0.001)
 	// Other fields from YAML remain intact
 	assert.Equal(t, "2.1.0", cfgOverridden.ServiceVersion)
 	assert.Equal(t, "stdout", cfgOverridden.ExporterType)
@@ -98,7 +98,7 @@ insecure: false
 	os.Unsetenv("OTEL_SAMPLE_PERCENTAGE")
 	cfgFromEnvFile := LoadConfigFromEnv()
 	assert.Equal(t, "yaml-pets-service", cfgFromEnvFile.ServiceName)
-	assert.Equal(t, 45.5, cfgFromEnvFile.SamplePercentage)
+	assert.InDelta(t, 45.5, cfgFromEnvFile.SamplePercentage, 0.001)
 }
 
 func TestInit_Sampling(t *testing.T) {
