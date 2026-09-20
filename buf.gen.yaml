@@ -16,6 +16,7 @@ plugins:
     out: gen/openapi
     opt:
       - format=yaml
+      - base=openapi.base.yaml
   - remote: buf.build/bufbuild/es:v2.2.3
     out: web/src/gen
     include_imports: true

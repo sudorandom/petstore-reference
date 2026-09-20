@@ -20,7 +20,7 @@ const scalarHtml = `<!doctype html>
     <script
       id="api-reference"
       data-url="/openapi.yaml"
-      data-configuration='{"theme":"purple","darkMode":true,"layout":"modern","showSidebar":true,"servers":[{"url":"http://localhost:8080","description":"Local API Server"}]}'
+      data-configuration='{"theme":"purple","darkMode":true,"layout":"modern","showSidebar":true,"servers":[{"url":"https://localhost:8080","description":"Local API Server (TLS)"},{"url":"http://localhost:8080","description":"Local API Server (Cleartext)"}]}'
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   </body>
