@@ -1,6 +1,6 @@
-# Pets Microservice Template
+# Petstore Reference Architecture (`petstore-reference`)
 
-A modern, production-grade Go microservice template modeled after the classic Petstore domain, built with **Go 1.27**, **ConnectRPC**, **Buf**, **protovalidate**, **FauxRPC**, **sqlc**, **PostgreSQL**, and an **Astro** frontend using **Connect-ES v2**.
+A modern, production-grade reference microservice modeled after the classic Petstore domain, built with **Go 1.27**, **ConnectRPC**, **OpenTelemetry**, **Buf**, **protovalidate**, **FauxRPC**, **sqlc**, **PostgreSQL**, and a **React + Vite** frontend using **TanStack Query** and **Connect-Web**.
 
 ---
 
@@ -11,16 +11,17 @@ A modern, production-grade Go microservice template modeled after the classic Pe
 | **Tooling Manager** | [mise](https://mise.jdx.dev) | Installs and manages `go`, `buf`, `sqlc`, `node`, `pnpm`, `fauxrpc`, etc. |
 | **Language** | Go 1.27 | High-performance backend runtime |
 | **RPC & API** | [ConnectRPC](https://connectrpc.com) | Multi-protocol RPC (Connect, gRPC, gRPC-Web) over HTTP/1.1 and HTTP/2 |
+| **Observability** | [OpenTelemetry](https://opentelemetry.io) | Distributed tracing with W3C `traceparent` adoption via `otelconnect` and `otelpgx` |
 | **Protobuf Management** | [Buf CLI](https://buf.build) | Linting, breaking change detection, and multi-language code generation |
 | **Validation** | [protovalidate](https://buf.build/bufbuild/protovalidate) | Schema-level validation rules compiled into Protobuf definitions |
 | **OpenAPI Generation** | [protoc-gen-connect-openapi](https://github.com/sudorandom/protoc-gen-connect-openapi) | Generates OpenAPI 3.1 specifications directly from Connect Protobuf definitions |
-| **Testing & Mocking** | [FauxRPC](https://github.com/sudorandom/fauxrpc) | Fake Connect/gRPC/REST server that dynamically generates valid test data |
+| **Testing & Mocking** | [FauxRPC](https://github.com/sudorandom/fauxrpc) | Fake Connect/gRPC/REST server with CEL dynamic stubs and failure simulation |
 | **Integration Testing** | [Testcontainers for Go](https://golang.testcontainers.org) | Ephemeral PostgreSQL containers with automated schema initialization |
 | **Database & ORM** | [sqlc](https://sqlc.dev) + [pgx/v5](https://github.com/jackc/pgx/v5) | Compile-time type-safe Go code generated from raw SQL queries |
-| **Local Database** | Docker Compose | Local PostgreSQL container with automated schema migrations |
+| **Local Database** | Docker Compose | Local PostgreSQL container with automated schema migrations via Goose |
 | **Linter & Security** | [golangci-lint](https://golangci-lint.run) + [gosec](https://github.com/securego/gosec) | Static analysis and security vulnerability scanner |
 | **Vulnerability Scanner** | [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck) | Official Go vulnerability scanner for known CVEs |
-| **Frontend** | [Astro](https://astro.build) + [Connect-ES v2](https://connectrpc.com/docs/node/migrating-v2) | Static/SSR web frontend with type-safe Connect-ES client |
+| **Frontend** | [React](https://react.dev) + [Vite](https://vite.dev) + [TanStack Query](https://tanstack.com/query) | Responsive SPA with Connect-Web, black/white dark mode toggle, and photo uploads |
 
 ---
 
@@ -35,32 +36,33 @@ A modern, production-grade Go microservice template modeled after the classic Pe
 ├── buf.gen.yaml            # Buf code generation for Go, OpenAPI, and TypeScript
 ├── sqlc.yaml               # SQLC configuration with pgx/v5 engine
 ├── cmd/
-│   └── server/
-│       └── main.go         # Microservice entry point (CORS, h2c, interceptors, OpenAPI)
+│   ├── migrate/            # Database migration CLI tool
+│   └── server/             # Microservice entry point (CORS, h2c, interceptors, OTel, OpenAPI)
 ├── internal/
 │   ├── auth/               # ConnectRPC Bearer Token authentication interceptor & context claims
 │   ├── config/             # Environment variable configuration
-│   ├── db/                 # SQLC generated database code & pgxpool initialization
-│   ├── pet/                # PetServiceHandler implementation
+│   ├── db/                 # SQLC generated database code & pgxpool with otelpgx
+│   ├── pet/                # PetServiceHandler implementation & photo streaming handler
+│   ├── telemetry/          # OpenTelemetry TracerProvider & Connect interceptor setup
 │   └── validator/          # protovalidate unary interceptor
 ├── proto/
 │   └── pet/v1/pet.proto    # Protobuf schema with validation rules
 ├── gen/                    # Generated Go stubs, OpenAPI specs, and binary descriptor images
-│   ├── go/pet/v1/          # Go pb and Connect stubs
-│   ├── openapi/pet/v1/     # OpenAPI 3.1 YAML definition
-│   └── image.binpb         # Buf binary image for FauxRPC
 ├── sql/
-│   ├── schema/001_pets.sql # DDL schema for PostgreSQL
-│   └── queries/pets.sql    # SQLC queries
+│   ├── schema/001_pets.sql # DDL schema for PostgreSQL (consolidated)
+│   └── queries/            # SQLC queries for pets and photos
+├── stubs/
+│   ├── normal/             # FauxRPC stubs with CEL dynamic responses
+│   └── failures/           # FauxRPC failure stubs for error testing
 ├── test/
-│   ├── fauxrpc_test.go     # End-to-end mock tests using FauxRPC
-│   └── integration_test.go # PostgreSQL integration tests
-└── web/                    # Astro frontend with Connect-ES v2
-    ├── astro.config.mjs
-    ├── package.json
-    └── src/
-        ├── lib/client.ts   # Connect-ES v2 client with auth interceptor
-        └── pages/index.astro
+│   └── integration_test.go # PostgreSQL & OpenTelemetry integration tests
+└── web/                    # React + Vite frontend with TanStack Query and Connect-Web
+    ├── src/
+    │   ├── components/     # Layout, ThemeSwitcher, etc.
+    │   ├── lib/            # Connect client, date utilities
+    │   ├── pages/          # PetList, PetDetails, CreatePet, EditPet, Docs
+    │   └── test/           # Vitest tests with ephemeral FauxRPC server
+    └── package.json
 ```
 
 ---
@@ -124,19 +126,23 @@ The service will be listening on `https://localhost:8080` (TLS enabled via `mkce
 - **Health Check:** `https://localhost:8080/healthz`
 - **Connect Service:** `https://localhost:8080/pet.v1.PetService/`
 
-### 6. Run the Astro Frontend
+### 6. Run the Web Frontend
 ```bash
 just web-dev
 ```
-Open `https://localhost:4321` in your browser (TLS enabled via `mkcert`).
-- **Web Interface:** `https://localhost:4321/`
-- **Embedded API Documentation (Scalar):** `https://localhost:4321/docs`
-- **OpenAPI 3.1 Spec (YAML):** `https://localhost:4321/openapi.yaml`
+Open `https://localhost:5173` in your browser (TLS enabled via `mkcert`).
+- **Web Interface:** `https://localhost:5173/`
+- **Embedded API Documentation (Scalar):** `https://localhost:5173/docs`
+- **OpenAPI 3.1 Spec (YAML):** `https://localhost:5173/openapi.yaml`
 
 ### 7. Run FauxRPC Standalone Mock Server
 To run a mock server with fake data without starting PostgreSQL:
 ```bash
+# Run with normal dynamic stubs (celfakeit)
 just fauxrpc
+
+# Run with failure stubs (simulating errors across all RPC methods)
+just fauxrpc-fail
 ```
 - **Mock Documentation:** `https://127.0.0.1:6660/fauxrpc/docs/`
 FauxRPC will be available over HTTPS at `https://127.0.0.1:6660` with built-in documentation at `/fauxrpc/docs/`.
@@ -148,15 +154,17 @@ You can test the frontend against FauxRPC both interactively in the browser and 
 1. In one terminal, start the FauxRPC mock server:
    ```bash
    just fauxrpc
+   # or test failure states:
+   just fauxrpc-fail
    ```
 2. In another terminal, start the web dev server configured for mock mode:
    ```bash
    just web-mock
    ```
-   The frontend at `https://localhost:4321` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
+   The frontend at `https://localhost:5173` will proxy all Connect-RPC requests to FauxRPC (`https://127.0.0.1:6660`) instead of the real backend.
 
 #### Automated Frontend Tests
-Run the Vitest test suite, which automatically spawns an ephemeral FauxRPC mock server and verifies frontend pages and components:
+Run the Vitest test suite, which automatically spawns ephemeral FauxRPC mock servers and verifies frontend pages, components, and error states:
 ```bash
 just test-web
 ```
