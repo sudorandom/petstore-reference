@@ -42,6 +42,36 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	assert.Equal(t, "otlp", cfg.ExporterType)
 }
 
+func TestInit(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("none exporter", func(t *testing.T) {
+		cfg := Config{
+			ServiceName:    "test-service",
+			ServiceVersion: "1.0.0",
+			ExporterType:   "none",
+		}
+		shutdown, err := Init(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, shutdown)
+		err = shutdown(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("stdout exporter", func(t *testing.T) {
+		cfg := Config{
+			ServiceName:    "test-service",
+			ServiceVersion: "1.0.0",
+			ExporterType:   "stdout",
+		}
+		shutdown, err := Init(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, shutdown)
+		err = shutdown(ctx)
+		require.NoError(t, err)
+	})
+}
+
 func TestInitAndConnectInterceptor(t *testing.T) {
 	ctx := context.Background()
 

@@ -5,18 +5,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	pgmodule "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	petv1 "github.com/example/pets/gen/go/pet/v1"
 	"github.com/example/pets/gen/go/pet/v1/petv1connect"
@@ -24,31 +18,16 @@ import (
 	"github.com/example/pets/internal/db"
 	"github.com/example/pets/internal/pet"
 	"github.com/example/pets/internal/telemetry"
+	"github.com/example/pets/internal/testutil"
 	"github.com/sudorandom/protojsonx/protojsonxconnect"
 )
-
-func init() {
-	// Automatically detect and configure Colima socket on macOS if DOCKER_HOST is not set
-	if os.Getenv("DOCKER_HOST") == "" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			colimaSock := filepath.Join(home, ".colima", "default", "docker.sock")
-			if _, err := os.Stat(colimaSock); err == nil {
-				_ = os.Setenv("DOCKER_HOST", "unix://"+colimaSock)
-				if os.Getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE") == "" {
-					_ = os.Setenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
-				}
-			}
-		}
-	}
-}
 
 type PetServiceIntegrationTestSuite struct {
 	suite.Suite
 
 	ctx              context.Context
 	cancel           context.CancelFunc
-	pgContainer      *pgmodule.PostgresContainer
+	testDB           *testutil.TestDB
 	pool             *pgxpool.Pool
 	server           *httptest.Server
 	client           petv1connect.PetServiceClient
@@ -59,40 +38,17 @@ type PetServiceIntegrationTestSuite struct {
 
 func (s *PetServiceIntegrationTestSuite) SetupSuite() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	dbURL := os.Getenv("DATABASE_URL")
 
-	if dbURL == "" {
-		pgContainer, err := pgmodule.Run(s.ctx,
-			"postgres:17-alpine",
-			pgmodule.WithDatabase("pets_db"),
-			pgmodule.WithUsername("postgres"),
-			pgmodule.WithPassword("password"),
-			testcontainers.WithWaitStrategy(
-				wait.ForLog("database system is ready to accept connections").
-					WithOccurrence(2).
-					WithStartupTimeout(60*time.Second),
-			),
-		)
-		if err != nil {
-			s.T().Skipf("Skipping integration test: Docker/Testcontainers not available: %v", err)
-			return
-		}
-		s.pgContainer = pgContainer
-
-		var errConn error
-		dbURL, errConn = pgContainer.ConnectionString(s.ctx, "sslmode=disable")
-		s.Require().NoError(errConn, "failed to get connection string from testcontainer")
+	testDB, err := testutil.StartTestDB(s.ctx)
+	if err != nil {
+		s.T().Skipf("Skipping integration test: Docker/Testcontainers not available: %v", err)
+		return
 	}
+	s.testDB = testDB
+	s.pool = testDB.Pool
 
-	pool, err := db.NewPool(s.ctx, dbURL)
-	s.Require().NoError(err, "failed to connect to database at %s", dbURL)
-	s.pool = pool
-
-	err = db.Migrate(s.ctx, pool)
-	s.Require().NoError(err, "failed to apply database migrations")
-
-	queries := db.New(pool)
-	service := pet.NewService(pool)
+	queries := db.New(s.pool)
+	petHandler := pet.NewHandler(s.pool)
 
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
 	s.Require().NoError(err, "failed to create otel interceptor")
@@ -105,7 +61,7 @@ func (s *PetServiceIntegrationTestSuite) SetupSuite() {
 	authInterceptor := auth.NewInterceptor(authCfg)
 
 	path, handler := petv1connect.NewPetServiceHandler(
-		service,
+		petHandler,
 		connect.WithCodec(&protojsonxconnect.Codec{}),
 		connect.WithInterceptors(otelInterceptor, valInterceptor, authInterceptor),
 	)
@@ -126,14 +82,17 @@ func (s *PetServiceIntegrationTestSuite) TearDownSuite() {
 	if s.server != nil {
 		s.server.Close()
 	}
-	if s.pool != nil {
-		s.pool.Close()
-	}
-	if s.pgContainer != nil {
-		_ = testcontainers.TerminateContainer(s.pgContainer)
+	if s.testDB != nil {
+		s.testDB.Close()
 	}
 	if s.cancel != nil {
 		s.cancel()
+	}
+}
+
+func (s *PetServiceIntegrationTestSuite) SetupTest() {
+	if s.testDB != nil {
+		s.Require().NoError(s.testDB.TruncateTables(s.ctx))
 	}
 }
 
@@ -322,6 +281,87 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 		s.Require().Error(err, "expected pet to be not found")
 		s.Equal(connect.CodeNotFound, connect.CodeOf(err))
 	})
+}
+
+func (s *PetServiceIntegrationTestSuite) TestUnauthenticatedCallRejection() {
+	req := connect.NewRequest(&petv1.CreatePetRequest{
+		Name:      "Shadow",
+		Species:   "Cat",
+		BirthDate: "2023-01-01",
+	})
+	// No Authorization header
+	_, err := s.client.CreatePet(s.ctx, req)
+	s.Require().Error(err)
+	s.Equal(connect.CodeUnauthenticated, connect.CodeOf(err))
+}
+
+func (s *PetServiceIntegrationTestSuite) TestFilteringAndPagination() {
+	// Database is automatically truncated before this test starts
+	petsToCreate := []struct {
+		name    string
+		species string
+		status  petv1.PetStatus
+	}{
+		{"Bella", "Dog", petv1.PetStatus_PET_STATUS_AVAILABLE},
+		{"Max", "Dog", petv1.PetStatus_PET_STATUS_ADOPTED},
+		{"Luna", "Cat", petv1.PetStatus_PET_STATUS_AVAILABLE},
+		{"Charlie", "Cat", petv1.PetStatus_PET_STATUS_PENDING},
+		{"Lucy", "Bird", petv1.PetStatus_PET_STATUS_AVAILABLE},
+	}
+
+	for _, p := range petsToCreate {
+		req := connect.NewRequest(&petv1.CreatePetRequest{
+			Name:      p.name,
+			Species:   p.species,
+			Status:    p.status,
+			BirthDate: "2023-01-01",
+		})
+		req.Header().Set("Authorization", "Bearer test-token")
+		_, err := s.client.CreatePet(s.ctx, req)
+		s.Require().NoError(err)
+	}
+
+	// Filter by species "Dog"
+	dogReq := connect.NewRequest(&petv1.ListPetsRequest{
+		Species: "Dog",
+	})
+	dogReq.Header().Set("Authorization", "Bearer test-token")
+	dogResp, err := s.client.ListPets(s.ctx, dogReq)
+	s.Require().NoError(err)
+	s.Equal(int32(2), dogResp.Msg.TotalCount)
+	s.Len(dogResp.Msg.Pets, 2)
+
+	// Filter by status "AVAILABLE"
+	availReq := connect.NewRequest(&petv1.ListPetsRequest{
+		Status: petv1.PetStatus_PET_STATUS_AVAILABLE,
+	})
+	availReq.Header().Set("Authorization", "Bearer test-token")
+	availResp, err := s.client.ListPets(s.ctx, availReq)
+	s.Require().NoError(err)
+	s.Equal(int32(3), availResp.Msg.TotalCount)
+	s.Len(availResp.Msg.Pets, 3)
+
+	// Pagination: pageSize=2, page=0
+	page0Req := connect.NewRequest(&petv1.ListPetsRequest{
+		PageSize: 2,
+		Page:     0,
+	})
+	page0Req.Header().Set("Authorization", "Bearer test-token")
+	page0Resp, err := s.client.ListPets(s.ctx, page0Req)
+	s.Require().NoError(err)
+	s.Equal(int32(5), page0Resp.Msg.TotalCount)
+	s.Len(page0Resp.Msg.Pets, 2)
+
+	// Pagination: pageSize=2, page=2 (should return 1 pet)
+	page2Req := connect.NewRequest(&petv1.ListPetsRequest{
+		PageSize: 2,
+		Page:     2,
+	})
+	page2Req.Header().Set("Authorization", "Bearer test-token")
+	page2Resp, err := s.client.ListPets(s.ctx, page2Req)
+	s.Require().NoError(err)
+	s.Equal(int32(5), page2Resp.Msg.TotalCount)
+	s.Len(page2Resp.Msg.Pets, 1)
 }
 
 func TestPetServiceIntegrationTestSuite(t *testing.T) {

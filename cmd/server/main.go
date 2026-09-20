@@ -13,6 +13,7 @@ import (
 
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
@@ -67,88 +68,10 @@ func main() {
 		log.Println("Skipping automatic database migrations (AUTO_MIGRATE=false). Use 'migrate' CLI for migrations.")
 	}
 
-	// Initialize Queries & Service
-	queries := db.New(pool)
-	petService := pet.NewService(pool)
-
-	// Interceptors: Tracing, Validation & Authentication
-	otelInterceptor, err := telemetry.NewConnectInterceptor()
+	handler, err := newServerHandler(cfg, pool)
 	if err != nil {
-		log.Fatalf("Failed to initialize OpenTelemetry Connect interceptor: %v", err)
+		log.Fatalf("Failed to initialize server handler: %v", err)
 	}
-	valInterceptor := validate.NewInterceptor()
-	authCfg := auth.Config{
-		Enabled:           cfg.AuthEnabled,
-		DevMode:           cfg.DevMode,
-		StaticTokens:      cfg.AuthTokens,
-		TrustProxyHeaders: cfg.TrustProxyHeaders || cfg.DevMode,
-		// Example: Allow GetPet and ListPets to be public if desired, or require auth for all
-		SkipProcedures: map[string]bool{
-			// petv1connect.PetServiceListPetsProcedure: true,
-			// petv1connect.PetServiceGetPetProcedure:   true,
-		},
-	}
-	authInterceptor := auth.NewInterceptor(authCfg)
-
-	mux := http.NewServeMux()
-
-	// Register ConnectRPC service
-	petPath, petHandler := petv1connect.NewPetServiceHandler(
-		petService,
-		connect.WithCodec(&protojsonxconnect.Codec{}),
-		connect.WithInterceptors(otelInterceptor, valInterceptor, authInterceptor),
-	)
-	mux.Handle(petPath, petHandler)
-	log.Printf("Registered Connect handler at %s", petPath)
-
-	// Serve generated OpenAPI documentation
-	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "gen/openapi/pet/v1/pet.openapi.yaml")
-	})
-
-	// Interactive OpenAPI Documentation (Scalar)
-	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html>
-<html>
-  <head>
-    <title>Petstore API Reference - OpenAPI</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-  </head>
-  <body>
-    <script id="api-reference" data-url="/openapi.yaml"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-  </body>
-</html>`))
-	})
-
-	// Health check endpoint
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if pool.Ping(r.Context()) == nil {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"status":"ok","database":"connected"}`))
-			return
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"status":"unavailable","database":"disconnected"}`))
-	})
-
-	// Serve uploaded pet photos directly to browsers (instrumented with OpenTelemetry)
-	photoHandler := otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos")
-	mux.Handle("GET /photos/{id}", auth.Middleware(authCfg)(photoHandler))
-
-	var rootHandler http.Handler = mux
-
-	// Locally in DevMode, apply dev identity middleware to inject simulated upstream IAP/OAuth2-Proxy headers
-	if cfg.DevMode {
-		log.Printf("Dev mode enabled: injecting local dev identity middleware (email: %s)", cfg.DevEmail)
-		rootHandler = auth.DevIdentityMiddleware(cfg.DevEmail, "dev-user-001")(rootHandler)
-	}
-
-	// CORS handler for web clients (supporting credentials and upstream proxy headers)
-	corsHandler := cors.New(corsOptions(cfg)).Handler(rootHandler)
 
 	// Support HTTP/1.1 and HTTP/2 (TLS & h2c) natively via Go http.Protocols
 	protocols := new(http.Protocols)
@@ -158,7 +81,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.Port),
-		Handler:           corsHandler,
+		Handler:           handler,
 		Protocols:         protocols,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
@@ -199,6 +122,86 @@ func main() {
 	}
 
 	log.Println("Server exited cleanly.")
+}
+
+func newServerHandler(cfg *config.Config, pool *pgxpool.Pool) (http.Handler, error) {
+	queries := db.New(pool)
+	petHandler := pet.NewHandler(pool)
+
+	otelInterceptor, err := telemetry.NewConnectInterceptor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize OpenTelemetry Connect interceptor: %w", err)
+	}
+	valInterceptor := validate.NewInterceptor()
+	authCfg := auth.Config{
+		Enabled:           cfg.AuthEnabled,
+		DevMode:           cfg.DevMode,
+		StaticTokens:      cfg.AuthTokens,
+		TrustProxyHeaders: cfg.TrustProxyHeaders || cfg.DevMode,
+		SkipProcedures:    map[string]bool{},
+	}
+	authInterceptor := auth.NewInterceptor(authCfg)
+
+	mux := http.NewServeMux()
+
+	petPath, connectHandler := petv1connect.NewPetServiceHandler(
+		petHandler,
+		connect.WithCodec(&protojsonxconnect.Codec{}),
+		connect.WithInterceptors(otelInterceptor, valInterceptor, authInterceptor),
+	)
+	mux.Handle(petPath, connectHandler)
+
+	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		candidates := []string{
+			"gen/openapi/pet/v1/pet.openapi.yaml",
+			"../../gen/openapi/pet/v1/pet.openapi.yaml",
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				http.ServeFile(w, r, c)
+				return
+			}
+		}
+		http.NotFound(w, r)
+	})
+
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!doctype html>
+<html>
+  <head>
+    <title>Petstore API Reference - OpenAPI</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script id="api-reference" data-url="/openapi.yaml"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`))
+	})
+
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if pool != nil && pool.Ping(r.Context()) == nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"ok","database":"connected"}`))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"status":"unavailable","database":"disconnected"}`))
+	})
+
+	photoHandler := otelhttp.NewHandler(pet.NewPhotoHandler(queries), "photos")
+	mux.Handle("GET /photos/{id}", auth.Middleware(authCfg)(photoHandler))
+
+	var rootHandler http.Handler = mux
+
+	if cfg.DevMode {
+		rootHandler = auth.DevIdentityMiddleware(cfg.DevEmail, "dev-user-001")(rootHandler)
+	}
+
+	return cors.New(corsOptions(cfg)).Handler(rootHandler), nil
 }
 
 func corsOptions(cfg *config.Config) cors.Options {

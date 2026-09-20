@@ -23,18 +23,23 @@ import (
 	"github.com/example/pets/internal/db"
 )
 
-type Service struct {
+type Handler struct {
 	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
-var _ petv1connect.PetServiceHandler = (*Service)(nil)
+var _ petv1connect.PetServiceHandler = (*Handler)(nil)
 
-func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{
+func NewHandler(pool *pgxpool.Pool) *Handler {
+	return &Handler{
 		pool:    pool,
 		queries: db.New(pool),
 	}
+}
+
+// New is a convenience alias for NewHandler.
+func New(pool *pgxpool.Pool) *Handler {
+	return NewHandler(pool)
 }
 
 func parseDate(dateStr string) (pgtype.Date, error) {
@@ -50,7 +55,7 @@ func isValidImageMime(detected, declared string) bool {
 		declared == "image/png" || declared == "image/gif" || declared == "image/webp")
 }
 
-func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.CreatePetRequest]) (*connect.Response[petv1.CreatePetResponse], error) {
+func (h *Handler) CreatePet(ctx context.Context, req *connect.Request[petv1.CreatePetRequest]) (*connect.Response[petv1.CreatePetResponse], error) {
 	msg := req.Msg
 
 	name := strings.TrimSpace(msg.Name)
@@ -79,7 +84,7 @@ func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.Crea
 		status = petv1.PetStatus_PET_STATUS_AVAILABLE
 	}
 
-	created, err := s.queries.CreatePet(ctx, db.CreatePetParams{
+	created, err := h.queries.CreatePet(ctx, db.CreatePetParams{
 		Name:               name,
 		Species:            species,
 		BirthDate:          birthDate,
@@ -98,13 +103,13 @@ func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.Crea
 	}), nil
 }
 
-func (s *Service) GetPet(ctx context.Context, req *connect.Request[petv1.GetPetRequest]) (*connect.Response[petv1.GetPetResponse], error) {
+func (h *Handler) GetPet(ctx context.Context, req *connect.Request[petv1.GetPetRequest]) (*connect.Response[petv1.GetPetResponse], error) {
 	var uid pgtype.UUID
 	if err := uid.Scan(req.Msg.Id); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
 	}
 
-	item, err := s.queries.GetPet(ctx, uid)
+	item, err := h.queries.GetPet(ctx, uid)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, connect.NewError(connect.CodeNotFound, errors.New("pet not found"))
@@ -112,7 +117,7 @@ func (s *Service) GetPet(ctx context.Context, req *connect.Request[petv1.GetPetR
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	photos, err := s.queries.ListPetPhotos(ctx, uid)
+	photos, err := h.queries.ListPetPhotos(ctx, uid)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -122,7 +127,7 @@ func (s *Service) GetPet(ctx context.Context, req *connect.Request[petv1.GetPetR
 	}), nil
 }
 
-func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListPetsRequest]) (*connect.Response[petv1.ListPetsResponse], error) {
+func (h *Handler) ListPets(ctx context.Context, req *connect.Request[petv1.ListPetsRequest]) (*connect.Response[petv1.ListPetsResponse], error) {
 	msg := req.Msg
 
 	limit := int32(20)
@@ -147,7 +152,7 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 		speciesParam = pgtype.Text{String: msg.Species, Valid: true}
 	}
 
-	pets, err := s.queries.ListPets(ctx, db.ListPetsParams{
+	pets, err := h.queries.ListPets(ctx, db.ListPetsParams{
 		Limit:   limit,
 		Offset:  int32(offset),
 		Status:  statusParam,
@@ -157,7 +162,7 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	totalCount, err := s.queries.CountPets(ctx, db.CountPetsParams{
+	totalCount, err := h.queries.CountPets(ctx, db.CountPetsParams{
 		Status:  statusParam,
 		Species: speciesParam,
 	})
@@ -171,7 +176,7 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 	}
 	photosByPet := make(map[uuid.UUID][]db.ListPetPhotosRow, len(pets))
 	if len(petIDs) > 0 {
-		photos, err := s.queries.ListPhotosForPets(ctx, petIDs)
+		photos, err := h.queries.ListPhotosForPets(ctx, petIDs)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
@@ -200,7 +205,7 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 	}), nil
 }
 
-func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.UpdatePetRequest]) (*connect.Response[petv1.UpdatePetResponse], error) {
+func (h *Handler) UpdatePet(ctx context.Context, req *connect.Request[petv1.UpdatePetRequest]) (*connect.Response[petv1.UpdatePetResponse], error) {
 	msg := req.Msg
 
 	var uid pgtype.UUID
@@ -234,7 +239,7 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 		status = petv1.PetStatus_PET_STATUS_AVAILABLE
 	}
 
-	updated, err := s.queries.UpdatePet(ctx, db.UpdatePetParams{
+	updated, err := h.queries.UpdatePet(ctx, db.UpdatePetParams{
 		ID:                 uid,
 		Name:               name,
 		Species:            species,
@@ -251,7 +256,7 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	photos, err := s.queries.ListPetPhotos(ctx, uid)
+	photos, err := h.queries.ListPetPhotos(ctx, uid)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -261,13 +266,13 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 	}), nil
 }
 
-func (s *Service) DeletePet(ctx context.Context, req *connect.Request[petv1.DeletePetRequest]) (*connect.Response[petv1.DeletePetResponse], error) {
+func (h *Handler) DeletePet(ctx context.Context, req *connect.Request[petv1.DeletePetRequest]) (*connect.Response[petv1.DeletePetResponse], error) {
 	var uid pgtype.UUID
 	if err := uid.Scan(req.Msg.Id); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
 	}
 
-	rowsAffected, err := s.queries.DeletePet(ctx, uid)
+	rowsAffected, err := h.queries.DeletePet(ctx, uid)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -280,7 +285,7 @@ func (s *Service) DeletePet(ctx context.Context, req *connect.Request[petv1.Dele
 	}), nil
 }
 
-func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1.UploadPetPhotoRequest]) (*connect.Response[petv1.UploadPetPhotoResponse], error) {
+func (h *Handler) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1.UploadPetPhotoRequest]) (*connect.Response[petv1.UploadPetPhotoResponse], error) {
 	msg := req.Msg
 
 	var petUID pgtype.UUID
@@ -297,14 +302,14 @@ func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("uploaded file content (%s) does not match declared image MIME type (%s)", detectedMime, msg.MimeType))
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to begin photo upload: %w", err))
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
-	txQueries := s.queries.WithTx(tx)
+	txQueries := h.queries.WithTx(tx)
 
 	// Verify pet exists inside the same transaction as the photo write.
 	_, err = txQueries.GetPet(ctx, petUID)
@@ -354,20 +359,20 @@ func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1
 	}), nil
 }
 
-func (s *Service) DeletePetPhoto(ctx context.Context, req *connect.Request[petv1.DeletePetPhotoRequest]) (*connect.Response[petv1.DeletePetPhotoResponse], error) {
+func (h *Handler) DeletePetPhoto(ctx context.Context, req *connect.Request[petv1.DeletePetPhotoRequest]) (*connect.Response[petv1.DeletePetPhotoResponse], error) {
 	var photoUID pgtype.UUID
 	if err := photoUID.Scan(req.Msg.PhotoId); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid photo UUID"))
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to begin photo deletion: %w", err))
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
-	txQueries := s.queries.WithTx(tx)
+	txQueries := h.queries.WithTx(tx)
 
 	petID, err := txQueries.DeletePetPhoto(ctx, photoUID)
 	if err != nil {

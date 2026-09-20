@@ -18,7 +18,7 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
 | **Validation** | [protovalidate](https://buf.build/bufbuild/protovalidate) | Schema-level validation rules compiled into Protobuf definitions |
 | **OpenAPI Generation** | [protoc-gen-connect-openapi](https://github.com/sudorandom/protoc-gen-connect-openapi) | Generates OpenAPI 3.1 specifications directly from Connect Protobuf definitions |
 | **Testing & Mocking** | [FauxRPC](https://github.com/sudorandom/fauxrpc) | Fake Connect/gRPC/REST server with CEL dynamic stubs and failure simulation |
-| **Integration Testing** | [Testcontainers for Go](https://golang.testcontainers.org) | Ephemeral PostgreSQL containers with automated schema initialization |
+| **Integration Testing** | [Testcontainers for Go](https://golang.testcontainers.org) | Ephemeral PostgreSQL containers with automated Goose migrations and TRUNCATE isolation |
 | **Database & ORM** | [sqlc](https://sqlc.dev) + [pgx/v5](https://github.com/jackc/pgx/v5) | Compile-time type-safe Go code generated from raw SQL queries |
 | **Local Database** | Docker Compose | Local PostgreSQL container with automated schema migrations via Goose |
 | **Linter & Security** | [golangci-lint](https://golangci-lint.run) + [gosec](https://github.com/securego/gosec) | Static analysis and security vulnerability scanner |
@@ -45,7 +45,8 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
 │   ├── config/             # Environment variable configuration
 │   ├── db/                 # SQLC generated database code & pgxpool with otelpgx
 │   ├── pet/                # PetServiceHandler implementation & photo streaming handler
-│   └── telemetry/          # OpenTelemetry TracerProvider & Connect interceptor setup
+│   ├── telemetry/          # OpenTelemetry TracerProvider & Connect interceptor setup
+│   └── testutil/           # PostgreSQL Testcontainers helper with Goose migrations & TRUNCATE
 ├── proto/
 │   └── pet/v1/pet.proto    # Protobuf schema with validation rules
 ├── gen/                    # Generated Go stubs, OpenAPI specs, and binary descriptor images
@@ -56,7 +57,7 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
 │   ├── normal/             # FauxRPC stubs with CEL dynamic responses
 │   └── failures/           # FauxRPC failure stubs for error testing
 ├── test/
-│   └── integration_test.go # PostgreSQL & OpenTelemetry integration tests
+│   └── integration_test.go # End-to-end ConnectRPC & PostgreSQL integration tests
 └── web/                    # React + Vite frontend with TanStack Query and Connect-Web
     ├── src/
     │   ├── components/     # Layout, ThemeSwitcher, etc.
@@ -93,14 +94,17 @@ just lint
 # Run Go vulnerability check
 just vulncheck
 
-# Run unit tests
+# Run internal tests (unit tests + database integration tests via Testcontainers)
 just test
 
-# Run all checks at once (lint, vulncheck, unit tests)
-just check
-
-# Run integration tests (PostgreSQL & FauxRPC)
+# Run end-to-end integration tests (ConnectRPC HTTP server + Testcontainers)
 just test-integration
+
+# Run frontend tests (Vitest + ephemeral FauxRPC mock server)
+just test-web
+
+# Run all quality & security checks at once (lint, vulncheck, test, test-web)
+just check
 ```
 
 ### 5. Run the Go Microservice
@@ -159,6 +163,18 @@ Or from the `web` directory:
 ```bash
 pnpm test
 ```
+
+---
+
+## 🧪 Testing
+
+Tests that touch the database run against real PostgreSQL (`postgres:17-alpine`) using **[Testcontainers for Go](https://golang.testcontainers.org)** instead of mocks or SQLite. This even includes top-level handler code, which makes those tests very powerful because they will interact with all layers beneath it without any mocking code. Very often, unit tests end up testing mock assertions more than your actual code if you leverage interfaces and mocking too often.
+
+- **Automated migrations**: Containers start with the full suite of Goose migrations applied via [`db.Migrate`](internal/db/migrate.go).
+- **Fast isolation via `TRUNCATE`**: To keep test suites fast (<3s), suites reuse the container and run `TRUNCATE TABLE pet_photos, pets RESTART IDENTITY CASCADE;` between tests instead of recreating containers.
+- **Docker & Colima**: Automatically detects Colima on macOS (`~/.colima/default/docker.sock`). Set `DATABASE_URL` to point tests at an existing database instead.
+- **Pure unit tests**: Logic without database dependencies (config, CORS, auth headers, validation helpers) runs in-memory.
+- **Frontend mocks**: Web tests in `web/` use [FauxRPC](https://github.com/sudorandom/fauxrpc) stubs to test UI states without a running backend.
 
 ---
 
