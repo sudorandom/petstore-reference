@@ -1,0 +1,29 @@
+version: "2"
+linters:
+  enable:
+    - gosec
+  settings:
+    gosec:
+      severity: medium
+      confidence: medium
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - gen
+      - internal/db
+      - web
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

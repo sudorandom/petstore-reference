@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package pet.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/example/pets/gen/go/pet/v1;petv1";
+
+enum PetStatus {
+  PET_STATUS_UNSPECIFIED = 0;
+  PET_STATUS_AVAILABLE = 1;
+  PET_STATUS_PENDING = 2;
+  PET_STATUS_ADOPTED = 3;
+}
+
+message Pet {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 100}];
+  string species = 3 [(buf.validate.field).string = {min_len: 1, max_len: 50}];
+  int32 age = 4 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+  PetStatus status = 5 [(buf.validate.field).enum.defined_only = true];
+  repeated string photo_urls = 6;
+  repeated string tags = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp modified_at = 9;
+  string created_by = 10;
+  string modified_by = 11;
+}
+
+message CreatePetRequest {
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 100}];
+  string species = 2 [(buf.validate.field).string = {min_len: 1, max_len: 50}];
+  int32 age = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+  PetStatus status = 4 [(buf.validate.field).enum.defined_only = true];
+  repeated string photo_urls = 5;
+  repeated string tags = 6;
+}
+
+message CreatePetResponse {
+  Pet pet = 1;
+}
+
+message GetPetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message GetPetResponse {
+  Pet pet = 1;
+}
+
+message ListPetsRequest {
+  // Filter by status (optional)
+  PetStatus status = 1;
+  // Filter by species (optional)
+  string species = 2;
+  // Maximum number of pets to return
+  int32 page_size = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+  // Page token / offset
+  int32 page = 4 [(buf.validate.field).int32 = {gte: 0}];
+}
+
+message ListPetsResponse {
+  repeated Pet pets = 1;
+  int32 total_count = 2;
+}
+
+message UpdatePetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 100}];
+  string species = 3 [(buf.validate.field).string = {min_len: 1, max_len: 50}];
+  int32 age = 4 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+  PetStatus status = 5 [(buf.validate.field).enum.defined_only = true];
+  repeated string photo_urls = 6;
+  repeated string tags = 7;
+}
+
+message UpdatePetResponse {
+  Pet pet = 1;
+}
+
+message DeletePetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message DeletePetResponse {
+  bool success = 1;
+}
+
+service PetService {
+  rpc CreatePet(CreatePetRequest) returns (CreatePetResponse);
+  rpc GetPet(GetPetRequest) returns (GetPetResponse);
+  rpc ListPets(ListPetsRequest) returns (ListPetsResponse);
+  rpc UpdatePet(UpdatePetRequest) returns (UpdatePetResponse);
+  rpc DeletePet(DeletePetRequest) returns (DeletePetResponse);
+}

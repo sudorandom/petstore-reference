@@ -1,0 +1,198 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"buf.build/go/protovalidate"
+	"connectrpc.com/connect"
+	"github.com/rs/cors"
+
+	"github.com/example/pets/gen/go/pet/v1/petv1connect"
+	"github.com/example/pets/internal/auth"
+	"github.com/example/pets/internal/config"
+	"github.com/example/pets/internal/db"
+	"github.com/example/pets/internal/pet"
+	"github.com/example/pets/internal/validator"
+	"github.com/sudorandom/protojsonx/protojsonxconnect"
+)
+
+func main() {
+	cfg := config.Load()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	log.Printf("Starting Pet Microservice on port %s...", cfg.Port)
+
+	// Initialize Protovalidate
+	pv, err := protovalidate.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize protovalidate: %v", err)
+	}
+
+	// Initialize Database Pool
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Printf("Warning: Database connection failed (%v). Service running in offline/readiness mode.", err)
+	} else {
+		defer pool.Close()
+		log.Println("Connected to PostgreSQL successfully.")
+
+		if err := db.Migrate(ctx, pool); err != nil {
+			log.Fatalf("Failed to apply database migrations: %v", err)
+		}
+	}
+
+	// Initialize Queries & Service
+	var queries *db.Queries
+	if pool != nil {
+		queries = db.New(pool)
+	}
+	petService := pet.NewService(queries)
+
+	// Interceptors: Validation & Authentication
+	valInterceptor := validator.NewInterceptor(pv)
+	authInterceptor := auth.NewInterceptor(auth.Config{
+		Enabled:      cfg.AuthEnabled,
+		DevMode:      cfg.DevMode,
+		StaticTokens: cfg.AuthTokens,
+		// Example: Allow GetPet and ListPets to be public if desired, or require auth for all
+		SkipProcedures: map[string]bool{
+			// petv1connect.PetServiceListPetsProcedure: true,
+			// petv1connect.PetServiceGetPetProcedure:   true,
+		},
+	})
+
+	mux := http.NewServeMux()
+
+	// Register ConnectRPC service
+	petPath, petHandler := petv1connect.NewPetServiceHandler(
+		petService,
+		connect.WithCodec(&protojsonxconnect.Codec{}),
+		connect.WithInterceptors(valInterceptor, authInterceptor),
+	)
+	mux.Handle(petPath, petHandler)
+	log.Printf("Registered Connect handler at %s", petPath)
+
+	// Serve generated OpenAPI documentation
+	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "gen/openapi/pet/v1/pet.openapi.yaml")
+	})
+
+	// Interactive OpenAPI Documentation (Scalar)
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!doctype html>
+<html>
+  <head>
+    <title>Petstore API Reference - OpenAPI</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script id="api-reference" data-url="/openapi.yaml"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`))
+	})
+
+	// Health check endpoint
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if pool != nil && pool.Ping(r.Context()) == nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"ok","database":"connected"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok","database":"disconnected"}`))
+	})
+
+	var rootHandler http.Handler = mux
+
+	// Locally in DevMode, apply dev identity middleware to inject simulated upstream IAP/OAuth2-Proxy headers
+	if cfg.DevMode {
+		log.Printf("Dev mode enabled: injecting local dev identity middleware (email: %s)", cfg.DevEmail)
+		rootHandler = auth.DevIdentityMiddleware(cfg.DevEmail, "dev-user-001")(rootHandler)
+	}
+
+	// CORS handler for web clients (supporting credentials and upstream proxy headers)
+	corsHandler := cors.New(cors.Options{
+		AllowOriginFunc: func(origin string) bool {
+			return true // Allow all origins with credentials
+		},
+		AllowCredentials: true,
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{"*"},
+		ExposedHeaders: []string{
+			"Content-Encoding",
+			"Connect-Content-Encoding",
+			"Grpc-Status",
+			"Grpc-Message",
+		},
+		MaxAge: 300,
+	}).Handler(rootHandler)
+
+	// Support HTTP/1.1 and HTTP/2 (TLS & h2c) natively via Go http.Protocols
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetHTTP2(true)
+	protocols.SetUnencryptedHTTP2(true)
+
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.Port),
+		Handler:           corsHandler,
+		Protocols:         protocols,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// Server shutdown signaling
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		hasTLS := false
+		if _, err := os.Stat(cfg.CertFile); err == nil {
+			if _, err := os.Stat(cfg.KeyFile); err == nil {
+				hasTLS = true
+			}
+		}
+
+		if hasTLS {
+			log.Printf("Pet Microservice listening on https://localhost:%s (TLS enabled via mkcert)", cfg.Port)
+			if err := srv.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("Server TLS error: %v", err)
+			}
+		} else {
+			log.Printf("Pet Microservice listening on http://localhost:%s (cleartext)", cfg.Port)
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("Server error: %v", err)
+			}
+		}
+	}()
+
+	<-stop
+	log.Println("Shutting down Pet Microservice...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced shutdown: %v", err)
+	}
+
+	log.Println("Server exited cleanly.")
+}

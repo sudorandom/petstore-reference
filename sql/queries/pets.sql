@@ -1,0 +1,41 @@
+-- name: CreatePet :one
+INSERT INTO pets (
+    name, species, age, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8
+)
+RETURNING *;
+
+-- name: GetPet :one
+SELECT * FROM pets
+WHERE id = $1 LIMIT 1;
+
+-- name: ListPets :many
+SELECT * FROM pets
+WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('species')::text IS NULL OR species = sqlc.narg('species'))
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: CountPets :one
+SELECT COUNT(*) FROM pets
+WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('species')::text IS NULL OR species = sqlc.narg('species'));
+
+-- name: UpdatePet :one
+UPDATE pets
+SET
+    name = $2,
+    species = $3,
+    age = $4,
+    status = $5,
+    photo_urls = $6,
+    tags = $7,
+    modified_at = NOW(),
+    modified_by = $8
+WHERE id = $1
+RETURNING *;
+
+-- name: DeletePet :exec
+DELETE FROM pets
+WHERE id = $1;

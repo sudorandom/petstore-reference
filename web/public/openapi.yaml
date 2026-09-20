@@ -1,0 +1,508 @@
+openapi: 3.1.0
+info:
+  title: pet.v1
+  description: API documentation for pet.v1
+  version: 1.0.0
+paths:
+  /pet.v1.PetService/CreatePet:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: CreatePet
+      operationId: pet.v1.PetService.CreatePet
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.CreatePetRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.CreatePetResponse'
+  /pet.v1.PetService/DeletePet:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: DeletePet
+      operationId: pet.v1.PetService.DeletePet
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.DeletePetRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.DeletePetResponse'
+  /pet.v1.PetService/GetPet:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: GetPet
+      operationId: pet.v1.PetService.GetPet
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.GetPetRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.GetPetResponse'
+  /pet.v1.PetService/ListPets:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: ListPets
+      operationId: pet.v1.PetService.ListPets
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.ListPetsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.ListPetsResponse'
+  /pet.v1.PetService/UpdatePet:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: UpdatePet
+      operationId: pet.v1.PetService.UpdatePet
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.UpdatePetRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.UpdatePetResponse'
+components:
+  schemas:
+    connect-protocol-version:
+      type: number
+      examples:
+        - 1
+      title: Connect-Protocol-Version
+      description: Define the version of the Connect protocol
+      const: 1
+    connect-timeout-header:
+      type: number
+      examples:
+        - 1000
+      title: Connect-Timeout-Ms
+      description: Define the timeout, in ms
+    connect.error:
+      type: object
+      properties:
+        code:
+          type: string
+          examples:
+            - not_found
+          enum:
+            - canceled
+            - unknown
+            - invalid_argument
+            - deadline_exceeded
+            - not_found
+            - already_exists
+            - permission_denied
+            - resource_exhausted
+            - failed_precondition
+            - aborted
+            - out_of_range
+            - unimplemented
+            - internal
+            - unavailable
+            - data_loss
+            - unauthenticated
+          description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+        message:
+          type: string
+          description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/connect.error_details.Any'
+          description: A list of messages that carry the error details. There is no limit on the number of messages.
+      title: Connect Error
+      additionalProperties: true
+      description: 'Error type returned by Connect: https://connectrpc.com/docs/go/errors/#http-representation'
+    connect.error_details.Any:
+      type: object
+      properties:
+        type:
+          type: string
+          description: 'A URL that acts as a globally unique identifier for the type of the serialized message. For example: `type.googleapis.com/google.rpc.ErrorInfo`.'
+        value:
+          type: string
+          format: binary
+          description: The Protobuf message, serialized as bytes and base64-encoded. The specific message type is identified by the `type` field.
+        debug:
+          type: object
+          title: Debug
+          additionalProperties: true
+          description: Deserialized error detail payload. The 'type' field indicates the schema. This field is for easier debugging and should not be relied upon for application logic.
+      additionalProperties: true
+      description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message, with an additional debug field for ConnectRPC error details.
+    google.protobuf.Timestamp:
+      type: string
+      examples:
+        - "2023-01-15T01:30:15.01Z"
+        - "2024-12-25T12:00:00Z"
+      format: date-time
+      description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
+    pet.v1.CreatePetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          title: name
+          maxLength: 100
+          minLength: 1
+        species:
+          type: string
+          title: species
+          maxLength: 50
+          minLength: 1
+        age:
+          type: integer
+          title: age
+          maximum: 100
+          minimum: 0
+          format: int32
+        status:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.PetStatus'
+          title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+          title: photo_urls
+        tags:
+          type: array
+          items:
+            type: string
+          title: tags
+      title: CreatePetRequest
+      additionalProperties: false
+    pet.v1.CreatePetResponse:
+      type: object
+      properties:
+        pet:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.Pet'
+          title: pet
+      title: CreatePetResponse
+      additionalProperties: false
+    pet.v1.DeletePetRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          format: uuid
+      title: DeletePetRequest
+      additionalProperties: false
+    pet.v1.DeletePetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          title: success
+      title: DeletePetResponse
+      additionalProperties: false
+    pet.v1.GetPetRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          format: uuid
+      title: GetPetRequest
+      additionalProperties: false
+    pet.v1.GetPetResponse:
+      type: object
+      properties:
+        pet:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.Pet'
+          title: pet
+      title: GetPetResponse
+      additionalProperties: false
+    pet.v1.ListPetsRequest:
+      type: object
+      properties:
+        status:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.PetStatus'
+          title: status
+          description: Filter by status (optional)
+        species:
+          type: string
+          title: species
+          description: Filter by species (optional)
+        pageSize:
+          type: integer
+          title: page_size
+          maximum: 100
+          minimum: 0
+          format: int32
+          description: Maximum number of pets to return
+        page:
+          type: integer
+          title: page
+          minimum: 0
+          format: int32
+          description: Page token / offset
+      title: ListPetsRequest
+      additionalProperties: false
+    pet.v1.ListPetsResponse:
+      type: object
+      properties:
+        pets:
+          type: array
+          items:
+            $ref: '#/components/schemas/pet.v1.Pet'
+          title: pets
+        totalCount:
+          type: integer
+          title: total_count
+          format: int32
+      title: ListPetsResponse
+      additionalProperties: false
+    pet.v1.Pet:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          format: uuid
+        name:
+          type: string
+          title: name
+          maxLength: 100
+          minLength: 1
+        species:
+          type: string
+          title: species
+          maxLength: 50
+          minLength: 1
+        age:
+          type: integer
+          title: age
+          maximum: 100
+          minimum: 0
+          format: int32
+        status:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.PetStatus'
+          title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+          title: photo_urls
+        tags:
+          type: array
+          items:
+            type: string
+          title: tags
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: created_at
+        modifiedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: modified_at
+        createdBy:
+          type: string
+          title: created_by
+        modifiedBy:
+          type: string
+          title: modified_by
+      title: Pet
+      additionalProperties: false
+    pet.v1.PetStatus:
+      type: string
+      title: PetStatus
+      enum:
+        - PET_STATUS_UNSPECIFIED
+        - PET_STATUS_AVAILABLE
+        - PET_STATUS_PENDING
+        - PET_STATUS_ADOPTED
+    pet.v1.UpdatePetRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          format: uuid
+        name:
+          type: string
+          title: name
+          maxLength: 100
+          minLength: 1
+        species:
+          type: string
+          title: species
+          maxLength: 50
+          minLength: 1
+        age:
+          type: integer
+          title: age
+          maximum: 100
+          minimum: 0
+          format: int32
+        status:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.PetStatus'
+          title: status
+        photoUrls:
+          type: array
+          items:
+            type: string
+          title: photo_urls
+        tags:
+          type: array
+          items:
+            type: string
+          title: tags
+      title: UpdatePetRequest
+      additionalProperties: false
+    pet.v1.UpdatePetResponse:
+      type: object
+      properties:
+        pet:
+          allOf:
+            - $ref: '#/components/schemas/pet.v1.Pet'
+          title: pet
+      title: UpdatePetResponse
+      additionalProperties: false
+security: []
+tags:
+  - name: pet.v1.PetService
