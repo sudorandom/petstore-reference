@@ -92,7 +92,7 @@ func (s *PetServiceIntegrationTestSuite) SetupSuite() {
 	s.Require().NoError(err, "failed to apply database migrations")
 
 	queries := db.New(pool)
-	service := pet.NewService(queries)
+	service := pet.NewService(pool)
 
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
 	s.Require().NoError(err, "failed to create otel interceptor")
@@ -288,6 +288,25 @@ func (s *PetServiceIntegrationTestSuite) TestPetLifecycle() {
 		defer postResp.Body.Close()
 
 		s.Equal(http.StatusMethodNotAllowed, postResp.StatusCode)
+	})
+
+	s.Run("DeletePetPhoto", func() {
+		s.Require().NotEmpty(s.uploadedPhotoID, "skipping DeletePetPhoto")
+
+		req := connect.NewRequest(&petv1.DeletePetPhotoRequest{PhotoId: s.uploadedPhotoID})
+		req.Header().Set("Authorization", "Bearer test-token")
+
+		resp, err := s.client.DeletePetPhoto(s.ctx, req)
+		s.Require().NoError(err, "DeletePetPhoto failed")
+		s.Require().NotNil(resp.Msg)
+		s.True(resp.Msg.Success)
+
+		// Verify photo is gone
+		getReq := connect.NewRequest(&petv1.GetPetPhotoRequest{PhotoId: s.uploadedPhotoID})
+		getReq.Header().Set("Authorization", "Bearer test-token")
+		_, err = s.client.GetPetPhoto(s.ctx, getReq)
+		s.Require().Error(err, "expected photo to be not found")
+		s.Equal(connect.CodeNotFound, connect.CodeOf(err))
 	})
 
 	s.Run("DeletePet", func() {

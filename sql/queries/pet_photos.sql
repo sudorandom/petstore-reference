@@ -17,9 +17,10 @@ FROM pet_photos
 WHERE pet_id = $1
 ORDER BY created_at DESC;
 
--- name: DeletePetPhoto :exec
+-- name: DeletePetPhoto :one
 DELETE FROM pet_photos
-WHERE id = $1;
+WHERE id = $1
+RETURNING pet_id;
 
 -- name: AddPetPhotoURL :one
 UPDATE pets

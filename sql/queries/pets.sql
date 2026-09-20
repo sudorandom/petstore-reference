@@ -14,7 +14,7 @@ WHERE id = $1 LIMIT 1;
 SELECT * FROM pets
 WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
   AND (sqlc.narg('species')::text IS NULL OR species = sqlc.narg('species'))
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CountPets :one
@@ -37,6 +37,14 @@ SET
 WHERE id = $1
 RETURNING *;
 
--- name: DeletePet :exec
+-- name: DeletePet :execrows
 DELETE FROM pets
 WHERE id = $1;
+
+-- name: RemovePetPhotoURL :one
+UPDATE pets
+SET photo_urls = array_remove(photo_urls, sqlc.arg('photo_url')::text),
+    modified_at = NOW(),
+    modified_by = $2
+WHERE id = $1
+RETURNING *;

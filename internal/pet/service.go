@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	petv1 "github.com/example/pets/gen/go/pet/v1"
@@ -23,19 +24,50 @@ import (
 )
 
 type Service struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 var _ petv1connect.PetServiceHandler = (*Service)(nil)
 
-func NewService(queries *db.Queries) *Service {
+func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{
-		queries: queries,
+		pool:    pool,
+		queries: db.New(pool),
+	}
+}
+
+func parseDate(dateStr string) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return pgtype.Date{}, errors.New("invalid birth_date format, expected YYYY-MM-DD")
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
+}
+
+func isValidImageMime(detected, declared string) bool {
+	switch declared {
+	case "image/jpeg":
+		return detected == "image/jpeg"
+	case "image/png":
+		return detected == "image/png"
+	case "image/gif":
+		return detected == "image/gif"
+	case "image/webp":
+		return detected == "image/webp" || detected == "application/octet-stream"
+	default:
+		return false
 	}
 }
 
 func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.CreatePetRequest]) (*connect.Response[petv1.CreatePetResponse], error) {
 	msg := req.Msg
+
+	name := strings.TrimSpace(msg.Name)
+	species := strings.TrimSpace(msg.Species)
+	if name == "" || species == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("name and species cannot be blank"))
+	}
 
 	photoUrls := msg.PhotoUrls
 	if photoUrls == nil {
@@ -48,19 +80,22 @@ func (s *Service) CreatePet(ctx context.Context, req *connect.Request[petv1.Crea
 
 	callerEmail := auth.UserEmailFromContext(ctx)
 
-	var birthDate pgtype.Date
-	t, err := time.Parse("2006-01-02", msg.BirthDate)
+	birthDate, err := parseDate(msg.BirthDate)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid birth_date format, expected YYYY-MM-DD"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	birthDate = pgtype.Date{Time: t, Valid: true}
+
+	status := msg.Status
+	if status == petv1.PetStatus_PET_STATUS_UNSPECIFIED {
+		status = petv1.PetStatus_PET_STATUS_AVAILABLE
+	}
 
 	created, err := s.queries.CreatePet(ctx, db.CreatePetParams{
-		Name:               msg.Name,
-		Species:            msg.Species,
+		Name:               name,
+		Species:            species,
 		BirthDate:          birthDate,
 		BirthDateEstimated: msg.BirthDateEstimated,
-		Status:             msg.Status.String(),
+		Status:             status.String(),
 		PhotoUrls:          photoUrls,
 		Tags:               tags,
 		CreatedBy:          callerEmail,
@@ -101,9 +136,12 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 	if msg.PageSize > 0 {
 		limit = msg.PageSize
 	}
-	offset := int32(0)
+	offset := int64(0)
 	if msg.Page > 0 {
-		offset = msg.Page * limit
+		offset = int64(msg.Page) * int64(limit)
+		if offset > math.MaxInt32 {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("page offset is too large"))
+		}
 	}
 
 	var statusParam pgtype.Text
@@ -118,7 +156,7 @@ func (s *Service) ListPets(ctx context.Context, req *connect.Request[petv1.ListP
 
 	pets, err := s.queries.ListPets(ctx, db.ListPetsParams{
 		Limit:   limit,
-		Offset:  offset,
+		Offset:  int32(offset),
 		Status:  statusParam,
 		Species: speciesParam,
 	})
@@ -162,6 +200,12 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
 	}
 
+	name := strings.TrimSpace(msg.Name)
+	species := strings.TrimSpace(msg.Species)
+	if name == "" || species == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("name and species cannot be blank"))
+	}
+
 	photoUrls := msg.PhotoUrls
 	if photoUrls == nil {
 		photoUrls = []string{}
@@ -173,20 +217,23 @@ func (s *Service) UpdatePet(ctx context.Context, req *connect.Request[petv1.Upda
 
 	callerEmail := auth.UserEmailFromContext(ctx)
 
-	var birthDate pgtype.Date
-	t, err := time.Parse("2006-01-02", msg.BirthDate)
+	birthDate, err := parseDate(msg.BirthDate)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid birth_date format, expected YYYY-MM-DD"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	birthDate = pgtype.Date{Time: t, Valid: true}
+
+	status := msg.Status
+	if status == petv1.PetStatus_PET_STATUS_UNSPECIFIED {
+		status = petv1.PetStatus_PET_STATUS_AVAILABLE
+	}
 
 	updated, err := s.queries.UpdatePet(ctx, db.UpdatePetParams{
 		ID:                 uid,
-		Name:               msg.Name,
-		Species:            msg.Species,
+		Name:               name,
+		Species:            species,
 		BirthDate:          birthDate,
 		BirthDateEstimated: msg.BirthDateEstimated,
-		Status:             msg.Status.String(),
+		Status:             status.String(),
 		PhotoUrls:          photoUrls,
 		Tags:               tags,
 		ModifiedBy:         callerEmail,
@@ -209,8 +256,12 @@ func (s *Service) DeletePet(ctx context.Context, req *connect.Request[petv1.Dele
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
 	}
 
-	if err := s.queries.DeletePet(ctx, uid); err != nil {
+	rowsAffected, err := s.queries.DeletePet(ctx, uid)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if rowsAffected == 0 {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("pet not found"))
 	}
 
 	return connect.NewResponse(&petv1.DeletePetResponse{
@@ -226,8 +277,26 @@ func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid pet UUID"))
 	}
 
-	// Verify pet exists
-	_, err := s.queries.GetPet(ctx, petUID)
+	if len(msg.Data) > 5*1024*1024 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("photo exceeds maximum allowed size"))
+	}
+
+	detectedMime := http.DetectContentType(msg.Data)
+	if !isValidImageMime(detectedMime, msg.MimeType) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("uploaded file content (%s) does not match declared image MIME type (%s)", detectedMime, msg.MimeType))
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to begin photo upload: %w", err))
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	txQueries := s.queries.WithTx(tx)
+
+	// Verify pet exists inside the same transaction as the photo write.
+	_, err = txQueries.GetPet(ctx, petUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, connect.NewError(connect.CodeNotFound, errors.New("pet not found"))
@@ -237,11 +306,7 @@ func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1
 
 	callerEmail := auth.UserEmailFromContext(ctx)
 
-	if len(msg.Data) > 5*1024*1024 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("photo exceeds maximum allowed size"))
-	}
-
-	createdPhoto, err := s.queries.CreatePetPhoto(ctx, db.CreatePetPhotoParams{
+	createdPhoto, err := txQueries.CreatePetPhoto(ctx, db.CreatePetPhotoParams{
 		PetID:     petUID,
 		Data:      msg.Data,
 		MimeType:  msg.MimeType,
@@ -254,13 +319,16 @@ func (s *Service) UploadPetPhoto(ctx context.Context, req *connect.Request[petv1
 	photoID := uuid.UUID(createdPhoto.ID.Bytes).String()
 	photoURL := fmt.Sprintf("/photos/%s", photoID)
 
-	updatedPet, err := s.queries.AddPetPhotoURL(ctx, db.AddPetPhotoURLParams{
+	updatedPet, err := txQueries.AddPetPhotoURL(ctx, db.AddPetPhotoURLParams{
 		ID:         petUID,
 		PhotoUrl:   photoURL,
 		ModifiedBy: callerEmail,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update pet photo list: %w", err))
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to commit pet photo: %w", err))
 	}
 
 	return connect.NewResponse(&petv1.UploadPetPhotoResponse{
@@ -292,8 +360,55 @@ func (s *Service) GetPetPhoto(ctx context.Context, req *connect.Request[petv1.Ge
 	}), nil
 }
 
+func (s *Service) DeletePetPhoto(ctx context.Context, req *connect.Request[petv1.DeletePetPhotoRequest]) (*connect.Response[petv1.DeletePetPhotoResponse], error) {
+	var photoUID pgtype.UUID
+	if err := photoUID.Scan(req.Msg.PhotoId); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid photo UUID"))
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to begin photo deletion: %w", err))
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	txQueries := s.queries.WithTx(tx)
+
+	petID, err := txQueries.DeletePetPhoto(ctx, photoUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("photo not found"))
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	callerEmail := auth.UserEmailFromContext(ctx)
+	photoURL := fmt.Sprintf("/photos/%s", uuid.UUID(photoUID.Bytes).String())
+	_, err = txQueries.RemovePetPhotoURL(ctx, db.RemovePetPhotoURLParams{
+		ID:         petID,
+		PhotoUrl:   photoURL,
+		ModifiedBy: callerEmail,
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update pet photo list: %w", err))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to commit photo deletion: %w", err))
+	}
+
+	return connect.NewResponse(&petv1.DeletePetPhotoResponse{
+		Success: true,
+	}), nil
+}
+
 func toProtoPet(p db.Pet) *petv1.Pet {
-	statusVal := petv1.PetStatus_value[p.Status]
+	statusStr := p.Status
+	if !strings.HasPrefix(statusStr, "PET_STATUS_") {
+		statusStr = "PET_STATUS_" + statusStr
+	}
+	statusVal := petv1.PetStatus_value[statusStr]
 
 	petID := uuid.UUID(p.ID.Bytes).String()
 
@@ -303,16 +418,16 @@ func toProtoPet(p db.Pet) *petv1.Pet {
 	}
 
 	protoPet := &petv1.Pet{
-		Id:                  petID,
-		Name:                p.Name,
-		Species:             p.Species,
-		BirthDate:           birthDateStr,
-		BirthDateEstimated:  p.BirthDateEstimated,
-		Status:              petv1.PetStatus(statusVal),
-		PhotoUrls:           p.PhotoUrls,
-		Tags:                p.Tags,
-		CreatedBy:           p.CreatedBy,
-		ModifiedBy:          p.ModifiedBy,
+		Id:                 petID,
+		Name:               p.Name,
+		Species:            p.Species,
+		BirthDate:          birthDateStr,
+		BirthDateEstimated: p.BirthDateEstimated,
+		Status:             petv1.PetStatus(statusVal),
+		PhotoUrls:          p.PhotoUrls,
+		Tags:               p.Tags,
+		CreatedBy:          p.CreatedBy,
+		ModifiedBy:         p.ModifiedBy,
 	}
 
 	if p.CreatedAt.Valid {
@@ -358,6 +473,7 @@ func NewPhotoHandler(queries *db.Queries) http.Handler {
 		w.Header().Set("Content-Type", photo.MimeType)
 		w.Header().Set("Content-Length", strconv.Itoa(len(photo.Data)))
 		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		_, _ = w.Write(photo.Data)
 	})
 }

@@ -37,9 +37,10 @@ func (m *mockPetService) ListPets(ctx context.Context, req *connect.Request[petv
 
 func TestAuthInterceptor(t *testing.T) {
 	cfg := auth.Config{
-		Enabled:      true,
-		DevMode:      false,
-		StaticTokens: []string{"valid-token-123"},
+		Enabled:           true,
+		DevMode:           false,
+		StaticTokens:      []string{"valid-token-123"},
+		TrustProxyHeaders: true,
 		SkipProcedures: map[string]bool{
 			petv1connect.PetServiceListPetsProcedure: true,
 		},
@@ -108,6 +109,58 @@ func TestAuthInterceptor(t *testing.T) {
 		assert.NotNil(t, resp.Msg)
 	})
 
+	t.Run("validator rejects missing IAP JWT assertion", func(t *testing.T) {
+		valCfg := auth.Config{
+			Enabled:           true,
+			TrustProxyHeaders: true,
+			Validator: func(ctx context.Context, token string) (*auth.Claims, error) {
+				return &auth.Claims{Email: "verified@example.com", Provider: "iap"}, nil
+			},
+		}
+		valPath, valHandler := petv1connect.NewPetServiceHandler(
+			svc,
+			connect.WithInterceptors(auth.NewInterceptor(valCfg)),
+		)
+		valMux := http.NewServeMux()
+		valMux.Handle(valPath, valHandler)
+		valServer := httptest.NewServer(valMux)
+		defer valServer.Close()
+
+		valClient := petv1connect.NewPetServiceClient(valServer.Client(), valServer.URL)
+		req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
+		req.Header().Set("X-Goog-Authenticated-User-Email", "accounts.google.com:unverified@example.com")
+		// Missing X-Goog-IAP-JWT-Assertion
+		_, err := valClient.GetPet(ctx, req)
+		require.Error(t, err)
+		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
+	})
+
+	t.Run("validator accepts valid IAP JWT assertion", func(t *testing.T) {
+		valCfg := auth.Config{
+			Enabled:           true,
+			TrustProxyHeaders: true,
+			Validator: func(ctx context.Context, token string) (*auth.Claims, error) {
+				return &auth.Claims{Email: "verified@example.com", Provider: "iap"}, nil
+			},
+		}
+		valPath, valHandler := petv1connect.NewPetServiceHandler(
+			svc,
+			connect.WithInterceptors(auth.NewInterceptor(valCfg)),
+		)
+		valMux := http.NewServeMux()
+		valMux.Handle(valPath, valHandler)
+		valServer := httptest.NewServer(valMux)
+		defer valServer.Close()
+
+		valClient := petv1connect.NewPetServiceClient(valServer.Client(), valServer.URL)
+		req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
+		req.Header().Set("X-Goog-IAP-JWT-Assertion", "valid-jwt-token")
+		resp, err := valClient.GetPet(ctx, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp.Msg)
+		assert.Equal(t, "verified@example.com", svc.lastClaims.Email)
+	})
+
 	t.Run("dev mode automatic identity fallback", func(t *testing.T) {
 		devCfg := auth.Config{
 			Enabled: true,
@@ -130,6 +183,27 @@ func TestAuthInterceptor(t *testing.T) {
 		require.NotNil(t, svc.lastClaims)
 		assert.Equal(t, "dev", svc.lastClaims.Provider)
 	})
+}
+
+func TestAuthInterceptorRejectsUntrustedProxyHeaders(t *testing.T) {
+	svc := &mockPetService{}
+	path, handler := petv1connect.NewPetServiceHandler(
+		svc,
+		connect.WithInterceptors(auth.NewInterceptor(auth.Config{Enabled: true})),
+	)
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client := petv1connect.NewPetServiceClient(server.Client(), server.URL)
+	req := connect.NewRequest(&petv1.GetPetRequest{Id: "123e4567-e89b-12d3-a456-426614174000"})
+	req.Header().Set("X-Forwarded-Email", "attacker@example.com")
+	req.Header().Set("X-Forwarded-User", "attacker")
+
+	_, err := client.GetPet(context.Background(), req)
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
 }
 
 func TestDevIdentityMiddleware(t *testing.T) {

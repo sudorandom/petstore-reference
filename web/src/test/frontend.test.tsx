@@ -81,7 +81,7 @@ describe('Frontend tests with FauxRPC mock server', () => {
     expect(firstPetName).toBeTruthy();
 
     // Verify search filter input exists and is functional
-    const searchInput = screen.getByPlaceholderText(/search by name, species, or tags/i);
+    const searchInput = screen.getByPlaceholderText(/search this page by name, species, or tags/i);
     expect(searchInput).toBeInTheDocument();
 
     fireEvent.change(searchInput, { target: { value: 'non-matching-query-xyz-123' } });
@@ -190,4 +190,3 @@ describe('Frontend tests with FauxRPC failure stubs', () => {
     }
   });
 });
-

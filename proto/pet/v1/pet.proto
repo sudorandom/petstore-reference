@@ -115,6 +115,14 @@ message GetPetPhotoResponse {
   string mime_type = 4;
 }
 
+message DeletePetPhotoRequest {
+  string photo_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message DeletePetPhotoResponse {
+  bool success = 1;
+}
+
 service PetService {
   rpc CreatePet(CreatePetRequest) returns (CreatePetResponse);
   rpc GetPet(GetPetRequest) returns (GetPetResponse);
@@ -123,5 +131,6 @@ service PetService {
   rpc DeletePet(DeletePetRequest) returns (DeletePetResponse);
   rpc UploadPetPhoto(UploadPetPhotoRequest) returns (UploadPetPhotoResponse);
   rpc GetPetPhoto(GetPetPhotoRequest) returns (GetPetPhotoResponse);
+  rpc DeletePetPhoto(DeletePetPhotoRequest) returns (DeletePetPhotoResponse);
 }
 

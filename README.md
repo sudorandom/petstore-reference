@@ -72,12 +72,14 @@ This was put together [by request](https://github.com/sudorandom/kmcd.dev/issues
 
 Authentication assumes an upstream reverse proxy or ingress auth layer (e.g. **Google Cloud IAP**, **OAuth2 Proxy**, **Envoy OAuth**, **Cloudflare Access**) that terminates user login at the boundary:
 - **Upstream Identity Extraction**:
-  - **Google Cloud IAP**: Automatically extracts user email (`X-Goog-Authenticated-User-Email`), subject ID (`X-Goog-Authenticated-User-Id`), and optional JWT assertions (`X-Goog-IAP-JWT-Assertion`).
-  - **OAuth2 Proxy / Ingress**: Automatically extracts email (`X-Forwarded-Email`), user (`X-Forwarded-User`), and groups/roles (`X-Forwarded-Groups`).
+  - **Google Cloud IAP**: Extracts user email (`X-Goog-Authenticated-User-Email`), subject ID (`X-Goog-Authenticated-User-Id`), and optional JWT assertions (`X-Goog-IAP-JWT-Assertion`) when `TRUST_PROXY_HEADERS=true`.
+  - **OAuth2 Proxy / Ingress**: Extracts email (`X-Forwarded-Email`), user (`X-Forwarded-User`), and groups/roles (`X-Forwarded-Groups`) when `TRUST_PROXY_HEADERS=true`.
   - **Service-to-Service Fallback**: Also accepts standard `Authorization: Bearer <token>` for machine-to-machine or CLI API calls.
 - **Context Propagation**: Authenticated caller [`Claims`](internal/auth/auth.go) are injected into `context.Context` (accessible via `auth.FromContext(ctx)`).
 - **Seamless Local Development**: In development mode (`DEV_MODE=true`), requests without upstream proxy headers automatically receive a default local dev identity, so the frontend and backend work out of the box without manual token inputs.
 - **Web Frontend**: The browser Connect-ES client uses `credentials: "include"` so session cookies are automatically passed to the proxy. No manual tokens are needed in the UI.
+
+`TRUST_PROXY_HEADERS` must only be enabled when the service cannot be reached without a trusted proxy that strips client-supplied identity headers. Production has no default bearer token; configure `AUTH_TOKENS`, trusted proxy headers, or both. Cross-origin browser clients must be explicitly listed in the comma-separated `CORS_ALLOWED_ORIGINS` variable.
 
 ---
 
@@ -173,4 +175,3 @@ Or from the `web` directory:
 ```bash
 pnpm test
 ```
-

@@ -88,14 +88,17 @@ func (q *Queries) CreatePetPhoto(ctx context.Context, arg CreatePetPhotoParams) 
 	return i, err
 }
 
-const deletePetPhoto = `-- name: DeletePetPhoto :exec
+const deletePetPhoto = `-- name: DeletePetPhoto :one
 DELETE FROM pet_photos
 WHERE id = $1
+RETURNING pet_id
 `
 
-func (q *Queries) DeletePetPhoto(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deletePetPhoto, id)
-	return err
+func (q *Queries) DeletePetPhoto(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, deletePetPhoto, id)
+	var pet_id pgtype.UUID
+	err := row.Scan(&pet_id)
+	return pet_id, err
 }
 
 const getPetPhoto = `-- name: GetPetPhoto :one

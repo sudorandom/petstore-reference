@@ -46,7 +46,7 @@ export const EditPet: React.FC = () => {
       setSpecies(pet.species);
       setBirthDate(pet.birthDate);
       setBirthDateEstimated(pet.birthDateEstimated);
-      setStatus(pet.status);
+      setStatus(pet.status || PetStatus.AVAILABLE);
       setTags((pet.tags || []).join(', '));
       setPhotos((pet.photoUrls || []).join(', '));
     }
@@ -97,12 +97,11 @@ export const EditPet: React.FC = () => {
     setIsUploading(true);
     try {
       const buffer = await file.arrayBuffer();
-      const res = await uploadPhotoMutation.mutateAsync({
+      await uploadPhotoMutation.mutateAsync({
         petId: pet.id,
         data: new Uint8Array(buffer),
         mimeType: file.type,
       });
-      setPhotos((prev) => (prev ? `${prev}, ${res.photoUrl}` : res.photoUrl));
     } catch (err: any) {
       let msg = err.rawMessage || err.message || String(err);
       msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');

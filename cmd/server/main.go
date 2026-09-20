@@ -27,6 +27,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if cfg.AuthEnabled && !cfg.DevMode && !cfg.TrustProxyHeaders && len(cfg.AuthTokens) == 0 {
+		log.Fatal("Authentication is enabled, but neither TRUST_PROXY_HEADERS nor AUTH_TOKENS is configured")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -50,22 +53,23 @@ func main() {
 	// Initialize Database Pool
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Printf("Warning: Database connection failed (%v). Service running in offline/readiness mode.", err)
-	} else {
-		defer pool.Close()
-		log.Println("Connected to PostgreSQL successfully.")
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer pool.Close()
+	log.Println("Connected to PostgreSQL successfully.")
 
+	if cfg.AutoMigrate {
+		log.Println("Applying database migrations (AUTO_MIGRATE=true)...")
 		if err := db.Migrate(ctx, pool); err != nil {
 			log.Fatalf("Failed to apply database migrations: %v", err)
 		}
+	} else {
+		log.Println("Skipping automatic database migrations (AUTO_MIGRATE=false). Use 'migrate' CLI for migrations.")
 	}
 
 	// Initialize Queries & Service
-	var queries *db.Queries
-	if pool != nil {
-		queries = db.New(pool)
-	}
-	petService := pet.NewService(queries)
+	queries := db.New(pool)
+	petService := pet.NewService(pool)
 
 	// Interceptors: Tracing, Validation & Authentication
 	otelInterceptor, err := telemetry.NewConnectInterceptor()
@@ -74,9 +78,10 @@ func main() {
 	}
 	valInterceptor := validate.NewInterceptor()
 	authInterceptor := auth.NewInterceptor(auth.Config{
-		Enabled:      cfg.AuthEnabled,
-		DevMode:      cfg.DevMode,
-		StaticTokens: cfg.AuthTokens,
+		Enabled:           cfg.AuthEnabled,
+		DevMode:           cfg.DevMode,
+		StaticTokens:      cfg.AuthTokens,
+		TrustProxyHeaders: cfg.TrustProxyHeaders || cfg.DevMode,
 		// Example: Allow GetPet and ListPets to be public if desired, or require auth for all
 		SkipProcedures: map[string]bool{
 			// petv1connect.PetServiceListPetsProcedure: true,
@@ -120,13 +125,13 @@ func main() {
 	// Health check endpoint
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if pool != nil && pool.Ping(r.Context()) == nil {
+		if pool.Ping(r.Context()) == nil {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"status":"ok","database":"connected"}`))
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok","database":"disconnected"}`))
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"status":"unavailable","database":"disconnected"}`))
 	})
 
 	// Serve uploaded pet photos directly to browsers (instrumented with OpenTelemetry)
@@ -141,29 +146,7 @@ func main() {
 	}
 
 	// CORS handler for web clients (supporting credentials and upstream proxy headers)
-	corsHandler := cors.New(cors.Options{
-		AllowOriginFunc: func(origin string) bool {
-			return true // Allow all origins with credentials
-		},
-		AllowCredentials: true,
-		AllowedMethods: []string{
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
-			http.MethodOptions,
-		},
-		AllowedHeaders: []string{"*"},
-		ExposedHeaders: []string{
-			"Content-Encoding",
-			"Connect-Content-Encoding",
-			"Grpc-Status",
-			"Grpc-Message",
-			"traceparent",
-			"tracestate",
-		},
-		MaxAge: 300,
-	}).Handler(rootHandler)
+	corsHandler := cors.New(corsOptions(cfg)).Handler(rootHandler)
 
 	// Support HTTP/1.1 and HTTP/2 (TLS & h2c) natively via Go http.Protocols
 	protocols := new(http.Protocols)
@@ -214,4 +197,37 @@ func main() {
 	}
 
 	log.Println("Server exited cleanly.")
+}
+
+func corsOptions(cfg *config.Config) cors.Options {
+	return cors.Options{
+		AllowedOrigins:   cfg.AllowedOrigins,
+		AllowCredentials: true,
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+			"Connect-Protocol-Version",
+			"Connect-Timeout-Ms",
+			"Grpc-Timeout",
+			"Traceparent",
+			"Tracestate",
+		},
+		ExposedHeaders: []string{
+			"Content-Encoding",
+			"Connect-Content-Encoding",
+			"Grpc-Status",
+			"Grpc-Message",
+			"traceparent",
+			"tracestate",
+		},
+		MaxAge: 300,
+	}
 }

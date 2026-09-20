@@ -2,9 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"net/http"
-	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -77,8 +77,9 @@ type Config struct {
 	// DevMode, when true, injects a mock identity if no upstream proxy headers or tokens are present.
 	DevMode bool
 
-	// RequireProxyHeaders, when true, requires valid IAP or OAuth proxy headers in non-dev environments.
-	RequireProxyHeaders bool
+	// TrustProxyHeaders permits identity headers inserted by a trusted reverse proxy.
+	// It must only be enabled when clients cannot reach the service without that proxy.
+	TrustProxyHeaders bool
 
 	// StaticTokens is an optional list of valid bearer tokens (e.g. for service-to-service or CLI).
 	StaticTokens []string
@@ -107,57 +108,66 @@ func NewInterceptor(cfg Config) connect.UnaryInterceptorFunc {
 
 			header := req.Header()
 
-			// 1. Check Google Cloud IAP headers
-			iapEmail := header.Get("X-Goog-Authenticated-User-Email")
-			iapID := header.Get("X-Goog-Authenticated-User-Id")
-			iapJWT := header.Get("X-Goog-IAP-JWT-Assertion")
+			if cfg.TrustProxyHeaders {
+				// 1. Check Google Cloud IAP headers
+				iapEmail := header.Get("X-Goog-Authenticated-User-Email")
+				iapID := header.Get("X-Goog-Authenticated-User-Id")
+				iapJWT := header.Get("X-Goog-IAP-JWT-Assertion")
 
-			if iapEmail != "" || iapJWT != "" {
-				cleanEmail := strings.TrimPrefix(iapEmail, "accounts.google.com:")
-				cleanID := strings.TrimPrefix(iapID, "accounts.google.com:")
+				if iapEmail != "" || iapJWT != "" {
+					var claims *Claims
+					if cfg.Validator != nil {
+						if iapJWT == "" {
+							return nil, connect.NewError(
+								connect.CodeUnauthenticated,
+								errors.New("missing required IAP JWT assertion"),
+							)
+						}
+						validatedClaims, err := cfg.Validator(ctx, iapJWT)
+						if err != nil {
+							return nil, connect.NewError(connect.CodeUnauthenticated, err)
+						}
+						claims = validatedClaims
+					} else {
+						cleanEmail := strings.TrimPrefix(iapEmail, "accounts.google.com:")
+						cleanID := strings.TrimPrefix(iapID, "accounts.google.com:")
 
-				claims := &Claims{
-					Subject:  cleanID,
-					Email:    cleanEmail,
-					Provider: "iap",
-					Roles:    []string{"user"},
-					RawToken: iapJWT,
-				}
-
-				if cfg.Validator != nil && iapJWT != "" {
-					validatedClaims, err := cfg.Validator(ctx, iapJWT)
-					if err != nil {
-						return nil, connect.NewError(connect.CodeUnauthenticated, err)
+						claims = &Claims{
+							Subject:  cleanID,
+							Email:    cleanEmail,
+							Provider: "iap",
+							Roles:    []string{"user"},
+							RawToken: iapJWT,
+						}
 					}
-					claims = validatedClaims
+
+					ctx = WithClaims(ctx, claims)
+					return next(ctx, req)
 				}
 
-				ctx = WithClaims(ctx, claims)
-				return next(ctx, req)
-			}
-
-			// 2. Check Generic OAuth2 Proxy / Ingress headers (e.g. oauth2-proxy, Envoy, Cloudflare Access)
-			forwardedEmail := header.Get("X-Forwarded-Email")
-			forwardedUser := header.Get("X-Forwarded-User")
-			if forwardedEmail != "" || forwardedUser != "" {
-				var roles []string
-				if groups := header.Get("X-Forwarded-Groups"); groups != "" {
-					for g := range strings.SplitSeq(groups, ",") {
-						roles = append(roles, strings.TrimSpace(g))
+				// 2. Check Generic OAuth2 Proxy / Ingress headers.
+				forwardedEmail := header.Get("X-Forwarded-Email")
+				forwardedUser := header.Get("X-Forwarded-User")
+				if forwardedEmail != "" || forwardedUser != "" {
+					var roles []string
+					if groups := header.Get("X-Forwarded-Groups"); groups != "" {
+						for g := range strings.SplitSeq(groups, ",") {
+							roles = append(roles, strings.TrimSpace(g))
+						}
 					}
-				}
-				if len(roles) == 0 {
-					roles = []string{"user"}
-				}
+					if len(roles) == 0 {
+						roles = []string{"user"}
+					}
 
-				claims := &Claims{
-					Subject:  forwardedUser,
-					Email:    forwardedEmail,
-					Provider: "oauth2-proxy",
-					Roles:    roles,
+					claims := &Claims{
+						Subject:  forwardedUser,
+						Email:    forwardedEmail,
+						Provider: "oauth2-proxy",
+						Roles:    roles,
+					}
+					ctx = WithClaims(ctx, claims)
+					return next(ctx, req)
 				}
-				ctx = WithClaims(ctx, claims)
-				return next(ctx, req)
 			}
 
 			// 3. Check Authorization: Bearer <token> (for service-to-service calls or API clients)
@@ -176,7 +186,15 @@ func NewInterceptor(cfg Config) connect.UnaryInterceptorFunc {
 						return next(ctx, req)
 					}
 
-					if slices.Contains(cfg.StaticTokens, token) {
+					var matched bool
+					for _, validToken := range cfg.StaticTokens {
+						if subtle.ConstantTimeCompare([]byte(token), []byte(validToken)) == 1 {
+							matched = true
+							break
+						}
+					}
+
+					if matched {
 						claims := &Claims{
 							Subject:  "service-account",
 							Email:    "service@internal",

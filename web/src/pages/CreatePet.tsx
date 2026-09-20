@@ -75,18 +75,26 @@ export const CreatePet: React.FC = () => {
         photoUrls: photoList,
       });
 
+      let uploadError: string | undefined;
       if (res.pet?.id && photoFile) {
-        const buffer = await photoFile.arrayBuffer();
-        await uploadPhotoMutation.mutateAsync({
-          petId: res.pet.id,
-          data: new Uint8Array(buffer),
-          mimeType: photoFile.type,
-        });
+        try {
+          const buffer = await photoFile.arrayBuffer();
+          await uploadPhotoMutation.mutateAsync({
+            petId: res.pet.id,
+            data: new Uint8Array(buffer),
+            mimeType: photoFile.type,
+          });
+        } catch (err: any) {
+          uploadError = (err.rawMessage || err.message || String(err)).replace(
+            /^\[[a-z_]+\]\s*/i,
+            ''
+          );
+        }
       }
 
       queryClient.invalidateQueries();
       if (res.pet?.id) {
-        navigate(`/pets/${res.pet.id}`);
+        navigate(`/pets/${res.pet.id}`, { state: { uploadError } });
       } else {
         navigate('/');
       }

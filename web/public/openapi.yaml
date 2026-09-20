@@ -87,6 +87,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/pet.v1.DeletePetResponse'
+  /pet.v1.PetService/DeletePetPhoto:
+    post:
+      tags:
+        - pet.v1.PetService
+      summary: DeletePetPhoto
+      operationId: pet.v1.PetService.DeletePetPhoto
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          required: true
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pet.v1.DeletePetPhotoRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pet.v1.DeletePetPhotoResponse'
   /pet.v1.PetService/GetPet:
     post:
       tags:
@@ -401,6 +440,23 @@ components:
             - $ref: '#/components/schemas/pet.v1.Pet'
           title: pet
       title: CreatePetResponse
+      additionalProperties: false
+    pet.v1.DeletePetPhotoRequest:
+      type: object
+      properties:
+        photoId:
+          type: string
+          title: photo_id
+          format: uuid
+      title: DeletePetPhotoRequest
+      additionalProperties: false
+    pet.v1.DeletePetPhotoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          title: success
+      title: DeletePetPhotoResponse
       additionalProperties: false
     pet.v1.DeletePetRequest:
       type: object

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@connectrpc/connect-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { PetService } from '../gen/pet/v1/pet_pb';
@@ -9,10 +9,13 @@ import { formatTimestamp, formatBirthDate, calculateAge } from '../lib/date';
 export const PetDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(
+    (location.state as { uploadError?: string } | null)?.uploadError || null
+  );
   const [isUploading, setIsUploading] = useState(false);
 
   const { data, isLoading, error } = useQuery(
@@ -43,6 +46,25 @@ export const PetDetails: React.FC = () => {
       setUploadError(msg);
     },
   });
+
+  const deletePhotoMutation = useMutation(PetService.method.deletePetPhoto, {
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setUploadError(null);
+    },
+    onError: (err) => {
+      let msg = err.rawMessage || err.message || String(err);
+      msg = msg.replace(/^\[[a-z_]+\]\s*/i, '');
+      setUploadError(`Failed to delete photo: ${msg}`);
+    },
+  });
+
+  const handleDeletePhoto = (url: string) => {
+    const photoId = url.replace('/photos/', '');
+    if (confirm('Are you sure you want to delete this photo?')) {
+      deletePhotoMutation.mutate({ photoId });
+    }
+  };
 
   const pet = data?.pet;
 
@@ -124,8 +146,21 @@ export const PetDetails: React.FC = () => {
   }
 
   const statusClass =
-    pet.status === 1 ? 'status-available' : pet.status === 2 ? 'status-pending' : 'status-adopted';
-  const statusName = pet.status === 1 ? 'Available' : pet.status === 2 ? 'Pending' : 'Adopted';
+    pet.status === 1
+      ? 'status-available'
+      : pet.status === 2
+        ? 'status-pending'
+        : pet.status === 3
+          ? 'status-adopted'
+          : 'status-unspecified';
+  const statusName =
+    pet.status === 1
+      ? 'Available'
+      : pet.status === 2
+        ? 'Pending'
+        : pet.status === 3
+          ? 'Adopted'
+          : 'Unspecified';
 
   return (
     <Layout
@@ -278,33 +313,48 @@ export const PetDetails: React.FC = () => {
             <div>
               {pet.photoUrls && pet.photoUrls.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                  {pet.photoUrls.map((url, i) => (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'block',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        overflow: 'hidden',
-                        backgroundColor: 'var(--bg-secondary)',
-                      }}
-                      title="View full image"
-                    >
-                      <img
-                        src={url}
-                        alt={`${pet.name} photo ${i + 1}`}
-                        style={{
-                          width: '120px',
-                          height: '120px',
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
-                      />
-                    </a>
-                  ))}
+                  {pet.photoUrls.map((url, i) => {
+                    const isUploaded = url.startsWith('/photos/');
+                    return (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'block',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            overflow: 'hidden',
+                            backgroundColor: 'var(--bg-secondary)',
+                          }}
+                          title="View full image"
+                        >
+                          <img
+                            src={url}
+                            alt={`${pet.name} photo ${i + 1}`}
+                            style={{
+                              width: '120px',
+                              height: '120px',
+                              objectFit: 'cover',
+                              display: 'block',
+                            }}
+                          />
+                        </a>
+                        {isUploaded && (
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleDeletePhoto(url)}
+                            disabled={deletePhotoMutation.isPending}
+                            style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>

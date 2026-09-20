@@ -80,14 +80,17 @@ func (q *Queries) CreatePet(ctx context.Context, arg CreatePetParams) (Pet, erro
 	return i, err
 }
 
-const deletePet = `-- name: DeletePet :exec
+const deletePet = `-- name: DeletePet :execrows
 DELETE FROM pets
 WHERE id = $1
 `
 
-func (q *Queries) DeletePet(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deletePet, id)
-	return err
+func (q *Queries) DeletePet(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePet, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getPet = `-- name: GetPet :one
@@ -119,7 +122,7 @@ const listPets = `-- name: ListPets :many
 SELECT id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by FROM pets
 WHERE ($3::text IS NULL OR status = $3)
   AND ($4::text IS NULL OR species = $4)
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -166,6 +169,41 @@ func (q *Queries) ListPets(ctx context.Context, arg ListPetsParams) ([]Pet, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const removePetPhotoURL = `-- name: RemovePetPhotoURL :one
+UPDATE pets
+SET photo_urls = array_remove(photo_urls, $3::text),
+    modified_at = NOW(),
+    modified_by = $2
+WHERE id = $1
+RETURNING id, name, species, birth_date, birth_date_estimated, status, photo_urls, tags, created_at, modified_at, created_by, modified_by
+`
+
+type RemovePetPhotoURLParams struct {
+	ID         pgtype.UUID `json:"id"`
+	ModifiedBy string      `json:"modified_by"`
+	PhotoUrl   string      `json:"photo_url"`
+}
+
+func (q *Queries) RemovePetPhotoURL(ctx context.Context, arg RemovePetPhotoURLParams) (Pet, error) {
+	row := q.db.QueryRow(ctx, removePetPhotoURL, arg.ID, arg.ModifiedBy, arg.PhotoUrl)
+	var i Pet
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Species,
+		&i.BirthDate,
+		&i.BirthDateEstimated,
+		&i.Status,
+		&i.PhotoUrls,
+		&i.Tags,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.CreatedBy,
+		&i.ModifiedBy,
+	)
+	return i, err
 }
 
 const updatePet = `-- name: UpdatePet :one
