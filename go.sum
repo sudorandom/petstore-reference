@@ -188,12 +188,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
-github.com/sudorandom/protojsonx v0.0.8 h1:HIkZk7kl30odmdI933aX3yBy34MCQsqg4FmvvcI7OKE=
-github.com/sudorandom/protojsonx v0.0.8/go.mod h1:di4xNN1xm4duU/3lpGWZMiOMgIEYE/ytXz41pI3iw+c=
 github.com/sudorandom/protojsonx v0.0.9 h1:qQZjO9f6ShgU6OqFlllfN0UMePUJ/kErOLqGK2QUAuQ=
 github.com/sudorandom/protojsonx v0.0.9/go.mod h1:a8p4ZvM+xNwxCZRY8Tkd5lVAfXmcXXRDawzlxhSKxiU=
-github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260721214515-374626bc07d2 h1:6QLMuUKBaZdW3mdE3IlaQmToIvK3nB3HJVAofMIKAnI=
-github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260721214515-374626bc07d2/go.mod h1:KRJm5bMshsUOoC4EL8pKl6TmEf22ma/5E4QH9Cv9Lz0=
 github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260922195035-c7b65e6e3eb3 h1:15HjvkRcsRa2mPbPvYaFEqj0BeFLQSkvinXz+VnyfQ0=
 github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260922195035-c7b65e6e3eb3/go.mod h1:VDon85DWdN9wffYvc/du38cB2oGIc+5NO00d18w51bs=
 github.com/testcontainers/testcontainers-go v0.44.0 h1:/Fwh6HY1mIikhnm9e7HwoxGycx0lzRAE0f5VQpjFxzI=
