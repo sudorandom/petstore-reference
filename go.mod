@@ -14,8 +14,8 @@ require (
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.12.1
-	github.com/sudorandom/protojsonx v0.0.8
-	github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260721214515-374626bc07d2
+	github.com/sudorandom/protojsonx v0.0.9
+	github.com/sudorandom/protojsonx/protojsonxconnect v0.0.0-20260922195035-c7b65e6e3eb3
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
 	go.opentelemetry.io/otel v1.46.0
